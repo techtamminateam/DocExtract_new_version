@@ -24,12 +24,19 @@ from config import Config, UploadConfig
 from models import db, ExtractionRecord, ExtractionResultStatus
 from routes.history import history_bp
 from routes.dashboard import result_status_bp
+from routes.templates_tab import template_bp
+
 
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 app = Flask(__name__)
 app.config.from_object(UploadConfig)
+
+app.register_blueprint(history_bp, url_prefix="/api")
+app.register_blueprint(result_status_bp, url_prefix="/api")
+app.register_blueprint(template_bp, url_prefix="/api")
+
 CORS(app)
 
 app.config.from_object(Config)
@@ -199,13 +206,17 @@ def text_extract_parallel(pdf_path: str) -> str:
 
 
 # ── Batch field extraction (all fields in ONE API call) ────────────────────────
-def extract_all_fields(data_points: list, combined_text: str, gemini_model) -> Dict[str, Any]:
+from templates import *
+
+def extract_all_fields(data_points: list, combined_text: str, gemini_model, selected_template: str) -> Dict[str, Any]:
     """
     Extract ALL fields in a single Gemini API call.
     Sends all data points and their prompts together.
     Returns a dict: { field_name: extracted_value, ... }
     """
     # Build field specifications
+    print(f"""The selected template is: {selected_template}""")
+
     field_specs = []
     for dp in data_points:
         field_name = dp["field"]
@@ -217,73 +228,20 @@ def extract_all_fields(data_points: list, combined_text: str, gemini_model) -> D
     # Build JSON output schema showing all expected fields
     expected_fields = ", ".join([f'"{dp["field"]}"' for dp in data_points])
     
-    full_prompt = f"""You are an expert healthcare document data extraction engine. Extract specific structured data from healthcare-related documents such as hospital bills, discharge summaries, prescriptions, lab reports, and insurance claim documents by strictly following per-field extraction instructions.
+    full_prompt = f"""
+            {selected_template}
 
-FIELDS TO EXTRACT (extract ALL of these):
-{fields_text}
+            FIELDS TO EXTRACT:
+            {fields_text}
 
-STRICT INSTRUCTIONS:
-- Return ONLY a valid JSON object with ALL requested fields. No explanation, preamble, or markdown fences.
-- Every field listed above MUST be present in your output (set to null if not found).
-- Follow each field's individual extraction instruction exactly.
-- Extract values exactly as written in the document; do NOT paraphrase, summarize, or infer unless explicitly instructed.
-- If a field cannot be found after careful search, set it to null — do NOT guess or hallucinate.
-- For numerical fields, extract only the numeric value unless explicitly stated otherwise.
-- For text fields, preserve exact wording from the document.
-- If multiple values exist, select the most relevant or final value (e.g., final diagnosis, final bill amount).
-- Keys in returned JSON must exactly match: {expected_fields}
+            OUTPUT RULES:
+            - Return ONLY valid JSON
+            - Include ALL fields: {expected_fields}
+            - If not found → null
 
-HEALTHCARE DATA EXTRACTION HINTS:
-
-PATIENT INFORMATION:
-- Patient Name: Look in header, patient details, or admission section
-- Patient ID: May appear as UHID, MRN, IP No, or Patient ID
-- Age/Gender: Often grouped together near patient details
-
-HOSPITAL & PROVIDER:
-- Hospital Name: Typically in header or footer
-- Doctor Name: Look for consulting doctor, attending physician, or surgeon
-
-DATES:
-- Admission Date: Found in admission/discharge section
-- Discharge Date: Found in discharge summary
-- Bill Date: Appears on invoice/bill header
-
-CLINICAL DATA:
-- Diagnosis: Look in "Diagnosis", "Final Diagnosis", or "Clinical Impression"
-- Procedures: Found under "Procedure", "Treatment", or "Surgery"
-- Medications: Look in prescription or discharge medication section
-- Lab Results: Extract structured values (test name, result, unit)
-
-BILLING DETAILS:
-- Bill Number: Invoice or bill reference number
-- Total Amount: Look for "Total", "Grand Total", "Net Payable"
-- Room Charges: Bed/room tariff section
-- Doctor Fees: Consultation or professional charges
-- Medicine Charges: Pharmacy or medicine section
-- Lab Charges: Diagnostics/lab billing section
-- Surgery Charges: Operation or procedure billing
-
-INSURANCE & CLAIMS:
-- Insurance Provider: Look for insurer name
-- Policy Number: Insurance policy reference
-- Claim Amount: Amount claimed from insurer
-- Approved Amount: Amount approved or settled by insurer
-
-DISCHARGE & FOLLOW-UP:
-- Discharge Summary: Look for summary/conclusion section
-- Follow-up Instructions: Found under advice, instructions, or recommendations
-
-DOCUMENT TYPES:
-- Documents may include: hospital bill, discharge summary, lab report, prescription, insurance claim form
-
-IMPORTANT:
-- Healthcare documents may contain both structured tables and unstructured clinical notes — check both carefully.
-- Prefer final/summary sections over intermediate notes when extracting conclusions.
-
-Document text (may contain both digital and OCR-extracted text):
-{combined_text}
-"""
+            Document text (may contain both digital and OCR-extracted text):
+            {combined_text}
+            """
     try:
         t0 = time.perf_counter()
         
@@ -329,6 +287,25 @@ Document text (may contain both digital and OCR-extracted text):
         logger.error(f"Batch extraction failed: {exc}", exc_info=True)
         # Return nulls for all fields on error
         return OrderedDict((dp["field"], None) for dp in data_points)
+
+
+def get_template(template_name):
+    match template_name:
+        case "Health Care Documents":
+            return HEALTHCARE_TEMPLATE
+        case "Financial Documents":
+            return FINANCIAL_TEMPLATE
+        case "MSA":
+            return MSA_TEMPLATE
+        case "Invoice":
+            return INVOICE_TEMPLATE
+        case "Legal":
+            return LEGAL_TEMPLATE
+        case "SOW":
+            return SOW_TEMPLATE
+        case _:
+            return FINANCIAL_TEMPLATE
+
 
 
 # ── /api/extract ──────────────────────────────────────────────────────────────
@@ -441,8 +418,11 @@ def extract():
         context_tokens = len(encoding.encode(combined_text))
         logger.info(f"[3/3] Batch field extraction  fields={n}  context_tokens={context_tokens}")
 
+        selected_template = get_template(template_name)
+
+
         # Extract ALL fields in a single Gemini API call
-        results = extract_all_fields(data_points, combined_text, gemini_model)
+        results = extract_all_fields(data_points, combined_text, gemini_model, selected_template)
 
         logger.info(f"[3/3] Done  ({time.perf_counter()-t_fields:.2f}s)")
         
@@ -479,8 +459,7 @@ def health():
         }
     })
 
-app.register_blueprint(history_bp, url_prefix="/api")
-app.register_blueprint(result_status_bp, url_prefix="/api")
+
 
 @app.route("/api/pdf/<path:filename>", methods=["GET"])
 def serve_pdf(filename):

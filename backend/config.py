@@ -3,5 +3,5 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 class UploadConfig:
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
+    MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 16 MB
     UPLOAD_FOLDER = "uploads"
