@@ -19,16 +19,16 @@ import {
 import { exportToExcel, deletePdf, ReviewView } from "./history";
 import "./Dashboard.css";
 
-const stats = [
-  { label: "Total Extractions", value: "650", icon: FileText, color: "blue", change: "+12 this week" },
-  { label: "Fields Approved", value: "4,821", icon: CheckCircle, color: "green", change: "+234 this week" },
-  { label: "Fields Flagged", value: "142", icon: AlertTriangle, color: "amber", change: "-18 this week" },
-  { label: "Pending Review", value: "32", icon: Clock, color: "gray", change: "2 documents" },
-];
-
 export function Dashboard({ setActiveNav }) {
   const [historyItems, setHistoryItems] = useState([]);
   const [reviewItem, setReviewItem] = useState(null);
+  const [recentPage, setRecentPage] = useState(1);
+  const [dashboardMetrics, setDashboardMetrics] = useState({
+    totalExtractions: 0,
+    approved: 0,
+    flagged: 0,
+    pending: 0,
+  });
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -43,6 +43,68 @@ export function Dashboard({ setActiveNav }) {
     };
     fetchHistory();
   }, []);
+
+  useEffect(() => {
+    const fetchDashboardMetrics = async () => {
+      try {
+        const response = await fetch("http://127.0.0.1:5000/api/result_status");
+        if (!response.ok) throw new Error("Failed to fetch dashboard metrics");
+        const data = await response.json();
+        const statusCount = data?.status_count || {};
+
+        setDashboardMetrics({
+          totalExtractions: Number(data?.pdf_files_count || 0),
+          approved: Number(statusCount.approved || 0),
+          flagged: Number(statusCount.flagged || 0),
+          pending: Number(statusCount.pending || 0),
+        });
+      } catch (err) {
+        console.error("Error fetching dashboard metrics:", err);
+      }
+    };
+
+    fetchDashboardMetrics();
+  }, []);
+
+  const stats = [
+    {
+      label: "Total Extractions",
+      value: historyItems.length.toLocaleString(),
+      icon: FileText,
+      color: "blue",
+      change: "Live data",
+    },
+    {
+      label: "Fields Approved",
+      value: dashboardMetrics.approved.toLocaleString(),
+      icon: CheckCircle,
+      color: "green",
+      change: "Live data",
+    },
+    {
+      label: "Fields Flagged",
+      value: dashboardMetrics.flagged.toLocaleString(),
+      icon: AlertTriangle,
+      color: "amber",
+      change: "Live data",
+    },
+    {
+      label: "Pending Review",
+      value: dashboardMetrics.pending.toLocaleString(),
+      icon: Clock,
+      color: "gray",
+      change: "Live data",
+    },
+  ];
+
+  const recentPerPage = 10;
+  const recentTotalPages = Math.max(1, Math.ceil(historyItems.length / recentPerPage));
+  const recentStart = (recentPage - 1) * recentPerPage;
+  const recentItems = historyItems.slice(recentStart, recentStart + recentPerPage);
+
+  useEffect(() => {
+    setRecentPage((prev) => Math.min(prev, recentTotalPages));
+  }, [recentTotalPages]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -150,7 +212,7 @@ export function Dashboard({ setActiveNav }) {
                   No recent extractions found.
                 </div>
               ) : (
-                historyItems.slice(0, 5).map((item, index) => {
+                recentItems.map((item, index) => {
                   const totalFields = item.data_points?.length || 0;
                   const approved = Object.values(item.results || {}).filter(
                     (v) => v !== null && v !== undefined
@@ -195,6 +257,25 @@ export function Dashboard({ setActiveNav }) {
                 })
               )}
             </div>
+            {historyItems.length > recentPerPage && (
+              <div className="recent-pagination">
+                <button
+                  className="recent-page-btn"
+                  onClick={() => setRecentPage((p) => Math.max(1, p - 1))}
+                  disabled={recentPage === 1}
+                >
+                  Previous
+                </button>
+                <span className="recent-page-info">Page {recentPage} of {recentTotalPages}</span>
+                <button
+                  className="recent-page-btn"
+                  onClick={() => setRecentPage((p) => Math.min(recentTotalPages, p + 1))}
+                  disabled={recentPage === recentTotalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right Panel */}

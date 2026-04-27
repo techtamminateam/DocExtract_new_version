@@ -315,7 +315,7 @@
   /* Main Grid */
   .main-grid {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
     gap: 24px;
   }
 
@@ -364,6 +364,36 @@
   .recent-list {
     display: flex;
     flex-direction: column;
+  }
+
+  .recent-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .recent-page-btn {
+    border: 1px solid var(--border-strong);
+    background: #FFFFFF;
+    color: var(--text-main);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .recent-page-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .recent-page-info {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
   }
 
   .recent-item {

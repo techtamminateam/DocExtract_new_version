@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Play } from "lucide-react";
+import { Play, User, Bell, Shield, KeyRound, CreditCard, Plus, LayoutGrid, Hash, Clock3 } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./DocExtract.css";
 import { History } from "./history";
@@ -1173,6 +1173,428 @@ function NewExtractionUI({
   );
 }
 
+function SettingsPage() {
+  const [activeTab, setActiveTab] = useState("Billings");
+  const [contactMode, setContactMode] = useState("existing");
+  const [additionalEmail, setAdditionalEmail] = useState("");
+  const [showExtraCard, setShowExtraCard] = useState(false);
+  const [primaryCard, setPrimaryCard] = useState({
+    name: "Alex Johnson",
+    expiry: "02 / 2028",
+    number: "8269 9620 9292 2538",
+    cvv: "1234",
+  });
+  const [extraCard, setExtraCard] = useState({
+    name: "",
+    expiry: "",
+    number: "",
+    cvv: "",
+  });
+
+  const billingRows = [
+    { invoice: "DocExtract Pro", date: "Apr 14, 2026", amount: "$299", status: "Paid", tracking: "INV-2026-0414" },
+    { invoice: "Extractions Add-on", date: "Apr 10, 2026", amount: "$89", status: "Pending", tracking: "INV-2026-0410" },
+    { invoice: "Storage Add-on", date: "Mar 28, 2026", amount: "$40", status: "Paid", tracking: "INV-2026-0328" },
+  ];
+
+  const renderSimpleCard = (icon, title, sub, actionLabel = "Update") => {
+    const Icon = icon;
+    return (
+      <div className="settings-profile-card">
+        <div className="settings-card-title">
+          <Icon size={16} />
+          <span>{title}</span>
+        </div>
+        <p style={{ color: "#8d93a8", fontSize: "13px", marginBottom: "14px" }}>{sub}</p>
+        <button className="settings-primary-btn">{actionLabel}</button>
+      </div>
+    );
+  };
+
+  const updatePrimaryCard = (field, value) => {
+    setPrimaryCard((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateExtraCard = (field, value) => {
+    setExtraCard((prev) => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <div className="settings-shell">
+      <div className="settings-wrap">
+        <div className="settings-head">
+          <h1>Settings</h1>
+          <p>Manage your account settings and preferences.</p>
+        </div>
+
+        <div className="settings-tabs">
+          {["My details", "Profile", "Password", "Billings", "Plan", "Email", "Notifications"].map((tab) => (
+            <button
+              key={tab}
+              className={`settings-tab${tab === activeTab ? " active" : ""}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <div className="settings-main-card">
+          {activeTab === "Billings" ? (
+            <div className="settings-billing-detail-card">
+              <div className="settings-billing-block">
+                <h2>Payment Method</h2>
+                <p>Update your billing details and address.</p>
+              </div>
+
+              <div className="settings-billing-grid">
+                <div className="settings-billing-block">
+                  <h3>Card Details</h3>
+                  <p>Update your billing details and address.</p>
+                  <button
+                    className="settings-card-action"
+                    onClick={() => setShowExtraCard((prev) => !prev)}
+                  >
+                    {showExtraCard ? "Hide additional card" : "+ Add another card"}
+                  </button>
+                </div>
+                <div className="settings-card-form">
+                  <label>
+                    Name on your Card
+                    <input
+                      value={primaryCard.name}
+                      onChange={(e) => updatePrimaryCard("name", e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Expiry
+                    <input
+                      value={primaryCard.expiry}
+                      onChange={(e) => updatePrimaryCard("expiry", e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Card Number
+                    <input
+                      value={primaryCard.number}
+                      onChange={(e) => updatePrimaryCard("number", e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    CVV
+                    <input
+                      value={primaryCard.cvv}
+                      onChange={(e) => updatePrimaryCard("cvv", e.target.value)}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {showExtraCard && (
+                <div className="settings-extra-card">
+                  <div className="settings-billing-block">
+                    <h3>Additional Card</h3>
+                    <p>Add backup billing card details.</p>
+                  </div>
+                  <div className="settings-card-form">
+                    <label>
+                      Name on your Card
+                      <input
+                        placeholder="Enter cardholder name"
+                        value={extraCard.name}
+                        onChange={(e) => updateExtraCard("name", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Expiry
+                      <input
+                        placeholder="MM / YYYY"
+                        value={extraCard.expiry}
+                        onChange={(e) => updateExtraCard("expiry", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Card Number
+                      <input
+                        placeholder="0000 0000 0000 0000"
+                        value={extraCard.number}
+                        onChange={(e) => updateExtraCard("number", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      CVV
+                      <input
+                        placeholder="***"
+                        value={extraCard.cvv}
+                        onChange={(e) => updateExtraCard("cvv", e.target.value)}
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              <div className="settings-contact-block">
+                <h3>Contact email</h3>
+                <p>Where should invoices be sent?</p>
+                <label className="settings-radio-row">
+                  <input
+                    type="radio"
+                    name="contactEmailMode"
+                    checked={contactMode === "existing"}
+                    onChange={() => setContactMode("existing")}
+                  />
+                  <span>Send to the existing email</span>
+                  <small>alex.johnson@company.com</small>
+                </label>
+                <label className="settings-radio-row">
+                  <input
+                    type="radio"
+                    name="contactEmailMode"
+                    checked={contactMode === "additional"}
+                    onChange={() => setContactMode("additional")}
+                  />
+                  <span>Add another email address</span>
+                </label>
+                {contactMode === "additional" && (
+                  <div className="settings-extra-email">
+                    <label>
+                      New billing email
+                      <input
+                        type="email"
+                        placeholder="name@company.com"
+                        value={additionalEmail}
+                        onChange={(e) => setAdditionalEmail(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div className="settings-billing-card">
+                <div className="settings-billing-head">
+                  <h2>Billing History</h2>
+                  <p>See your recent subscription and add-on invoices.</p>
+                </div>
+                <div className="settings-billing-table-wrap">
+                  <table className="settings-billing-table">
+                    <thead>
+                      <tr>
+                        <th>Invoice</th>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Tracking</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {billingRows.map((row) => (
+                        <tr key={row.tracking}>
+                          <td>{row.invoice}</td>
+                          <td>{row.date}</td>
+                          <td>{row.amount}</td>
+                          <td>
+                            <span className={`settings-status-badge ${row.status.toLowerCase()}`}>{row.status}</span>
+                          </td>
+                          <td>{row.tracking}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === "Profile" ? (
+            <div className="settings-profile-card">
+              <div className="settings-card-title">
+                <User size={16} />
+                <span>Profile</span>
+              </div>
+
+              <div className="settings-profile-grid">
+                <div className="settings-field">
+                  <span>Full Name</span>
+                  <strong>Alex Johnson</strong>
+                </div>
+                <button className="settings-link-btn">Edit</button>
+
+                <div className="settings-field">
+                  <span>Email</span>
+                  <strong>alex.johnson@company.com</strong>
+                </div>
+                <button className="settings-link-btn">Edit</button>
+
+                <div className="settings-field">
+                  <span>Organization</span>
+                  <strong>Acme Corp</strong>
+                </div>
+                <button className="settings-link-btn">Edit</button>
+              </div>
+
+              <button className="settings-primary-btn">Update Profile</button>
+            </div>
+          ) : activeTab === "Notifications" ? (
+            renderSimpleCard(Bell, "Notifications", "Manage extraction alerts and email preferences.", "Update Notification Preferences")
+          ) : activeTab === "Password" ? (
+            renderSimpleCard(Shield, "Security", "Password, two-factor authentication, and sessions.", "Update Security Settings")
+          ) : activeTab === "Email" ? (
+            renderSimpleCard(Bell, "Email Preferences", "Manage delivery settings for extraction summaries and alerts.", "Update Email Settings")
+          ) : activeTab === "Plan" ? (
+            renderSimpleCard(CreditCard, "Plan", "View and manage your active subscription plan and limits.", "Manage Plan")
+          ) : activeTab === "My details" ? (
+            renderSimpleCard(User, "My Details", "Personal details used across your DocExtract workspace.", "Update Details")
+          ) : (
+            renderSimpleCard(KeyRound, "API Keys", "Manage API access tokens for integrations.", "Manage API Keys")
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TemplatesPage({ onUseTemplate }) {
+  const [templates, setTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
+  const [templatesError, setTemplatesError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchTemplates = async () => {
+      setLoadingTemplates(true);
+      setTemplatesError("");
+      try {
+        const response = await fetch("http://127.0.0.1:5000/api/templates");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch templates (${response.status})`);
+        }
+        const data = await response.json();
+        const list = Array.isArray(data) ? data : Array.isArray(data.templates) ? data.templates : [];
+        if (isMounted) setTemplates(list);
+      } catch (err) {
+        if (isMounted) {
+          setTemplates([]);
+          setTemplatesError(err.message || "Failed to load templates.");
+        }
+      } finally {
+        if (isMounted) setLoadingTemplates(false);
+      }
+    };
+
+    fetchTemplates();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const getFields = (template) => {
+    if (Array.isArray(template.data_points)) {
+      return template.data_points.map((dp) => (typeof dp === "string" ? dp : dp?.field || "")).filter(Boolean);
+    }
+    if (Array.isArray(template.fields)) return template.fields;
+    return [];
+  };
+
+  const getUpdatedText = (template) => {
+    const raw = template.updated_at || template.created_at || template.timestamp;
+    if (!raw) return "Recently";
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return "Recently";
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const getDescription = (template, fields) => {
+    if (template.description && String(template.description).trim()) return template.description;
+    const lead = template.name || template.template_name || "This template";
+    const fieldWords = fields.slice(0, 3).join(", ");
+    return fieldWords
+      ? `${lead} extraction focused on ${fieldWords.toLowerCase()}.`
+      : `${lead} extraction configuration for document processing.`;
+  };
+
+  const getRelatedWords = (template, fields) => {
+    const fromName = String(template.name || template.template_name || "")
+      .split(/[\s-_]+/)
+      .map((w) => w.trim())
+      .filter((w) => w.length > 2);
+    const fromFields = fields.slice(0, 4);
+    return [...new Set([...fromName, ...fromFields])].slice(0, 6);
+  };
+
+  return (
+    <div className="templates-shell">
+      <div className="templates-head">
+        <div>
+          <h1>Templates</h1>
+          <p>Reusable extraction configurations for common document types</p>
+        </div>
+        <button className="templates-new-btn">
+          <Plus size={14} />
+          New Template
+        </button>
+      </div>
+
+      {loadingTemplates ? (
+        <div className="templates-state">Loading templates...</div>
+      ) : templatesError ? (
+        <div className="templates-state error">{templatesError}</div>
+      ) : templates.length === 0 ? (
+        <div className="templates-state">No templates available from API.</div>
+      ) : (
+        <div className="templates-grid">
+          {templates.map((template, idx) => {
+            const fields = getFields(template);
+            const visibleFields = fields.slice(0, 5);
+            const moreCount = Math.max(fields.length - visibleFields.length, 0);
+            return (
+              <div
+                className="template-card"
+                key={template.id || template.name || idx}
+                onClick={() => onUseTemplate?.(template)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onUseTemplate?.(template);
+                  }
+                }}
+              >
+                <div className="template-card-top">
+                  <span className="template-icon">
+                    <LayoutGrid size={15} />
+                  </span>
+                  <h3>{template.name || template.template_name || "Untitled Template"}</h3>
+                  <p>{getDescription(template, fields)}</p>
+                </div>
+
+                <div className="template-tags">
+                  {getRelatedWords(template, visibleFields).map((field) => (
+                    <span key={field} className="template-tag">{field}</span>
+                  ))}
+                  {moreCount > 0 && <span className="template-tag">+{moreCount} more</span>}
+                </div>
+
+                <div className="template-card-foot">
+                  <span><Hash size={12} /> {fields.length} fields</span>
+                  <span><Clock3 size={12} /> {getUpdatedText(template)}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUseTemplate?.(template);
+                    }}
+                  >
+                    Use
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── COMPONENT ─────────────────────────────────────────────────────────────────
 export default function DocExtract() {
   // State
@@ -1228,6 +1650,30 @@ export default function DocExtract() {
   const onDragLeave = () => setDragging(false);
   const onDrop = (e) => { e.preventDefault(); setDragging(false); applyFile(e.dataTransfer.files[0]); };
   const onFileChange = (e) => { if (e.target.files[0]) applyFile(e.target.files[0]); };
+
+  const useTemplateForExtraction = (template) => {
+    const name = template?.name || template?.template_name || "";
+    const apiDataPoints = Array.isArray(template?.data_points) ? template.data_points : [];
+    const apiFields = Array.isArray(template?.fields) ? template.fields : [];
+    const normalized = (apiDataPoints.length > 0 ? apiDataPoints : apiFields).map((item) => {
+      if (typeof item === "string") {
+        return { id: nextId(), field: item, prompt: "" };
+      }
+      return {
+        id: nextId(),
+        field: item?.field || item?.name || "",
+        prompt: item?.prompt || item?.instruction || "",
+      };
+    }).filter((dp) => dp.field.trim());
+
+    setDataPoints(normalized);
+    setExpanded(Object.fromEntries(normalized.map((dp) => [dp.id, !dp.prompt])));
+    setPreset(name);
+    setResult(null);
+    setError("");
+    setVerifyMode(false);
+    setActiveNav("extraction");
+  };
 
   // ── Data Points ────────────────────────────────────────────────────────────
   const addDataPoint = (field, prompt) => {
@@ -1655,10 +2101,7 @@ export default function DocExtract() {
 
         {/* Templates - Empty for now */}
         {activeNav === "templates" && (
-          <div style={{ padding: "40px", textAlign: "center", color: "var(--text-dim)" }}>
-            <h2>Templates</h2>
-            <p>Coming soon...</p>
-          </div>
+          <TemplatesPage onUseTemplate={useTemplateForExtraction} />
         )}
 
         {/* Integrations - Empty for now */}
@@ -1676,10 +2119,7 @@ export default function DocExtract() {
 
         {/* Settings - Empty for now */}
         {activeNav === "settings" && (
-          <div style={{ padding: "40px", textAlign: "center", color: "var(--text-dim)" }}>
-            <h2>Settings</h2>
-            <p>Coming soon...</p>
-          </div>
+          <SettingsPage />
         )}
       </div> {/* end de-main */}
     </div>
