@@ -26,6 +26,32 @@ const stats = [
   { label: "Pending Review", value: "32", icon: Clock, color: "gray", change: "2 documents" },
 ];
 
+
+const getResults = async () => {
+  try {
+    const res = await fetch("http://localhost:5000/api/result_status",
+      {
+        method: "GET",
+        headers: {
+          "ngrok-skip-browser-warning": "true", // bypasses ngrok HTML interstitial
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+
+    const data = await res.json();
+    console.log(data);
+
+  } catch (error) {
+    console.error("Error fetching results:", error);
+  }
+};
+
+
 export function Dashboard({ setActiveNav }) {
   const [historyItems, setHistoryItems] = useState([]);
   const [reviewItem, setReviewItem] = useState(null);
@@ -112,6 +138,11 @@ export function Dashboard({ setActiveNav }) {
               Export
             </button>
           </div>
+          <button className="primary-btn">
+            <Plus size={16} />
+            New Extraction
+          </button>
+          <button onClick={getResults}>Get results</button>
         </div>
 
         {/* Stats */}

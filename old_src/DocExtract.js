@@ -1249,7 +1249,8 @@ export default function DocExtract() {
 
     if (presetValue === "Invoice Checking") {
       setSelectedPreset(PRESETS_POLICY_CHECKING);
-    } else if (presetValue === "Financial Statements") {
+    } 
+    else if (presetValue === "Financial Statements") {
       setSelectedPreset(PRESETS_FINANCE);
     }
     else if (presetValue === "Legal Documents") {
