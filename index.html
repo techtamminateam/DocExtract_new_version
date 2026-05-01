@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DocExtract — PDF Field Extraction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #07090f;
+  --surface:    #0d1120;
+  --surface2:   #131826;
+  --surface3:   #181f30;
+  --border:     #1c2338;
+  --border2:    #28324f;
+  --cyan:       #00e5ff;
+  --cyan-dim:   #00b8cc;
+  --cyan-glow:  rgba(0,229,255,0.12);
+  --cyan-glow2: rgba(0,229,255,0.05);
+  --green:      #00ff9d;
+  --red:        #ff4560;
+  --yellow:     #ffc94d;
+  --purple:     #b06aff;
+  --text:       #c4d0ec;
+  --text-dim:   #5e6f88;
+  --text-muted: #2e3a50;
+  --mono:       'Space Mono', monospace;
+  --sans:       'Syne', sans-serif;
+  --r:          6px;
+  --r-lg:       12px;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.018) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+
+/* ── LAYOUT ── */
+.wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px 100px; }
+
+/* ── HEADER ── */
+header {
+  padding: 36px 0 28px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 36px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.logo { display: flex; align-items: center; gap: 14px; }
+.logo-box {
+  width: 42px; height: 42px;
+  border: 1.5px solid var(--cyan);
+  border-radius: var(--r);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 18px var(--cyan-glow);
+}
+.logo-box svg { width: 20px; height: 20px; stroke: var(--cyan); }
+.logo-name { font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -0.3px; }
+.logo-name span { color: var(--cyan); }
+.badge {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px;
+  color: var(--cyan-dim); background: var(--cyan-glow2);
+  border: 1px solid var(--border2); padding: 4px 12px; border-radius: 100px;
+  text-transform: uppercase;
+}
+
+/* ── STEP HEADER ── */
+.step-hd {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 12px;
+}
+.step-num {
+  font-family: var(--mono); font-size: 10px; color: var(--cyan);
+  border: 1px solid var(--border2); border-radius: 50%;
+  width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.step-title { font-size: 13px; font-weight: 700; color: #fff; }
+.step-sub { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+.step-line { flex: 1; height: 1px; background: var(--border); }
+
+/* ── CARD ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 22px;
+  margin-bottom: 18px;
+  transition: border-color 0.2s;
+}
+.card:focus-within { border-color: var(--border2); }
+
+/* ── UPLOAD ── */
+#drop-zone {
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--r-lg);
+  padding: 36px 24px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  background: var(--surface2);
+  transition: all 0.2s;
+}
+#drop-zone:hover, #drop-zone.dragover {
+  border-color: var(--cyan); background: var(--cyan-glow2);
+  box-shadow: 0 0 28px var(--cyan-glow);
+}
+#drop-zone input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.up-icon {
+  width: 44px; height: 44px; border: 1.5px solid var(--border2);
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  background: var(--surface); margin: 0 auto 14px;
+}
+.up-icon svg { width: 20px; height: 20px; stroke: var(--cyan-dim); }
+.up-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 5px; }
+.up-sub { font-size: 12px; color: var(--text-dim); }
+.up-sub b { color: var(--cyan); font-weight: 400; font-family: var(--mono); }
+
+#file-info {
+  display: none; margin-top: 14px;
+  padding: 10px 14px;
+  background: rgba(0,255,157,0.06);
+  border: 1px solid rgba(0,255,157,0.18);
+  border-radius: var(--r);
+  font-family: var(--mono); font-size: 12px; color: var(--green);
+  align-items: center; gap: 10px;
+}
+#file-info.show { display: flex; }
+#file-info .rm { margin-left: auto; cursor: pointer; color: var(--red); font-size: 15px; opacity: 0.7; }
+#file-info .rm:hover { opacity: 1; }
+
+/* ── DATAPOINTS BUILDER ── */
+.dp-add-row {
+  display: flex; gap: 10px; margin-bottom: 16px; align-items: flex-start;
+}
+.dp-field-input {
+  flex: 0 0 220px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 10px 14px;
+  font-family: var(--mono); font-size: 12px; color: var(--text);
+  outline: none; transition: border-color 0.2s;
+}
+.dp-field-input::placeholder { color: var(--text-muted); }
+.dp-field-input:focus { border-color: var(--cyan-dim); }
+
+.dp-prompt-input {
+  flex: 1;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 10px 14px;
+  font-family: var(--mono); font-size: 12px; color: var(--text);
+  outline: none; transition: border-color 0.2s;
+  resize: none; min-height: 40px;
+}
+.dp-prompt-input::placeholder { color: var(--text-muted); }
+.dp-prompt-input:focus { border-color: var(--cyan-dim); }
+
+.dp-add-btn {
+  flex-shrink: 0;
+  background: var(--cyan-glow); border: 1px solid var(--cyan-dim);
+  color: var(--cyan); padding: 10px 16px;
+  border-radius: var(--r); font-family: var(--mono); font-size: 12px;
+  font-weight: 700; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.dp-add-btn:hover { background: rgba(0,229,255,0.18); box-shadow: 0 0 12px var(--cyan-glow); }
+
+/* add row labels */
+.dp-add-labels {
+  display: flex; gap: 10px; margin-bottom: 8px;
+}
+.dp-add-labels span {
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 0.5px;
+}
+.dp-add-labels span:first-child { flex: 0 0 220px; }
+.dp-add-labels span:nth-child(2) { flex: 1; }
+
+/* ── DP LIST ── */
+#dp-list { display: flex; flex-direction: column; gap: 10px; }
+
+.dp-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  animation: slideIn 0.15s ease;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.dp-item-head {
+  display: flex; align-items: center; gap: 0;
+  border-bottom: 1px solid var(--border);
+}
+.dp-item-num {
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  padding: 10px 12px; border-right: 1px solid var(--border);
+  min-width: 40px; text-align: center;
+}
+.dp-item-name {
+  font-family: var(--mono); font-size: 13px; color: var(--cyan);
+  padding: 10px 14px; flex: 1;
+  display: flex; align-items: center; gap: 10px;
+}
+.dp-item-name input {
+  background: transparent; border: none; outline: none;
+  font-family: var(--mono); font-size: 13px; color: var(--cyan);
+  width: 100%; caret-color: var(--cyan);
+}
+.dp-item-name input::placeholder { color: var(--text-muted); }
+.dp-expand-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); padding: 10px 14px;
+  font-size: 11px; font-family: var(--mono);
+  transition: color 0.15s; display: flex; align-items: center; gap: 6px;
+}
+.dp-expand-btn:hover { color: var(--cyan); }
+.dp-expand-btn .arrow { transition: transform 0.2s; display: inline-block; }
+.dp-expand-btn.open .arrow { transform: rotate(180deg); }
+.dp-delete-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); padding: 10px 14px;
+  font-size: 16px; border-left: 1px solid var(--border);
+  transition: color 0.15s; line-height: 1;
+}
+.dp-delete-btn:hover { color: var(--red); }
+
+.dp-item-body {
+  padding: 12px 14px;
+  display: none;
+}
+.dp-item-body.open { display: block; }
+.dp-prompt-label {
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.dp-prompt-label .pl-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--purple); flex-shrink: 0;
+}
+.dp-item-textarea {
+  width: 100%; min-height: 90px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 10px 14px;
+  font-family: var(--mono); font-size: 11px; color: var(--text);
+  line-height: 1.7; resize: vertical; outline: none;
+  transition: border-color 0.2s;
+}
+.dp-item-textarea::placeholder { color: var(--text-muted); }
+.dp-item-textarea:focus { border-color: var(--border2); }
+
+.dp-prompt-status {
+  margin-top: 6px; font-family: var(--mono); font-size: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+.pst-filled { color: var(--green); }
+.pst-empty  { color: var(--red); }
+
+/* ── EMPTY STATE ── */
+#dp-empty {
+  padding: 28px; text-align: center;
+  font-family: var(--mono); font-size: 12px; color: var(--text-muted);
+  border: 1.5px dashed var(--border); border-radius: var(--r);
+}
+
+/* ── PRESETS ── */
+.presets-row {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px;
+}
+.presets-label {
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.preset-chip {
+  font-family: var(--mono); font-size: 10px;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-dim); padding: 4px 12px;
+  border-radius: 100px; cursor: pointer; transition: all 0.15s;
+}
+.preset-chip:hover { border-color: var(--cyan-dim); color: var(--cyan); background: var(--cyan-glow2); }
+
+/* ── SUMMARY BAR ── */
+.summary-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r); margin-top: 16px;
+  flex-wrap: wrap; gap: 12px;
+}
+.sb-stat {
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+  display: flex; align-items: center; gap: 8px;
+}
+.sb-stat .sv { color: var(--cyan); font-weight: 700; }
+.sb-stat .sv.warn { color: var(--red); }
+.sb-stat .sv.ok { color: var(--green); }
+.sb-sep { width: 1px; height: 16px; background: var(--border); }
+
+/* ── EXTRACT ── */
+.run-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+  padding: 22px 0; border-top: 1px solid var(--border); margin-top: 4px;
+}
+.run-info {
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim); line-height: 1.8;
+}
+.run-info .rv { color: var(--cyan); }
+
+#extract-btn {
+  background: var(--cyan); color: var(--bg);
+  border: none; padding: 13px 32px;
+  border-radius: var(--r); font-family: var(--mono); font-size: 13px;
+  font-weight: 700; cursor: pointer; transition: all 0.2s;
+  position: relative; overflow: hidden; min-width: 170px;
+}
+#extract-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+#extract-btn:not(:disabled):hover {
+  box-shadow: 0 0 26px rgba(0,229,255,0.45); transform: translateY(-1px);
+}
+.btn-spin {
+  display: none; width: 15px; height: 15px;
+  border: 2px solid rgba(7,9,15,0.25); border-top-color: var(--bg);
+  border-radius: 50%; animation: spin 0.6s linear infinite;
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+}
+#extract-btn.loading .btn-spin { display: block; }
+#extract-btn.loading .btn-txt { opacity: 0.7; }
+@keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
+
+/* ── PROGRESS ── */
+#prog-wrap {
+  display: none; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r); overflow: hidden; height: 5px; margin-bottom: 16px;
+}
+#prog-wrap.show { display: block; }
+#prog-bar {
+  height: 100%; background: linear-gradient(90deg, var(--cyan-dim), var(--cyan));
+  width: 0%; transition: width 0.4s ease; box-shadow: 0 0 8px var(--cyan-glow);
+}
+#prog-msg {
+  font-family: var(--mono); font-size: 11px; color: var(--cyan-dim);
+  min-height: 16px; margin-bottom: 8px;
+}
+
+/* ── ERROR ── */
+#error-box {
+  display: none; background: rgba(255,69,96,0.07);
+  border: 1px solid rgba(255,69,96,0.28); border-radius: var(--r);
+  padding: 12px 16px; font-family: var(--mono); font-size: 12px;
+  color: var(--red); margin-bottom: 18px;
+}
+#error-box.show { display: block; }
+
+/* ── RESULTS ── */
+#results-section { display: none; }
+#results-section.show { display: block; animation: fadeUp 0.3s ease; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.res-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.res-title-g { display: flex; align-items: center; gap: 10px; }
+.res-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 8px var(--green);
+  animation: blink 2s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
+.res-title { font-size: 15px; font-weight: 700; color: #fff; }
+.res-count {
+  font-family: var(--mono); font-size: 10px;
+  background: rgba(0,255,157,0.08); border: 1px solid rgba(0,255,157,0.22);
+  color: var(--green); padding: 3px 10px; border-radius: 100px;
+}
+.res-acts { display: flex; gap: 8px; }
+.act-btn {
+  font-family: var(--mono); font-size: 11px;
+  background: var(--surface2); border: 1px solid var(--border2);
+  color: var(--text-dim); padding: 6px 14px; border-radius: var(--r);
+  cursor: pointer; transition: all 0.15s;
+}
+.act-btn:hover { border-color: var(--cyan-dim); color: var(--cyan); background: var(--cyan-glow2); }
+
+.vtoggle { display: flex; border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.vt { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+  padding: 6px 12px; cursor: pointer; border: none; background: transparent; color: var(--text-dim); transition: all 0.15s; }
+.vt.active { background: var(--cyan-glow); color: var(--cyan); }
+
+/* cards grid */
+#fields-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.fc {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 14px 16px; transition: border-color 0.15s;
+}
+.fc:hover { border-color: var(--border2); }
+.fc-key { font-family: var(--mono); font-size: 10px; color: var(--cyan-dim); margin-bottom: 7px;
+  letter-spacing: 0.5px; text-transform: uppercase; }
+.fc-val { font-size: 12px; color: var(--text); line-height: 1.5; word-break: break-word; }
+.fc-val.null { color: var(--text-muted); font-style: italic; }
+
+/* json viewer */
+#json-viewer { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
+.jvt { display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.jv-dots { display: flex; gap: 6px; }
+.jv-dot { width: 10px; height: 10px; border-radius: 50%; }
+.jv-dot:nth-child(1){background:#ff5f57}.jv-dot:nth-child(2){background:#febc2e}.jv-dot:nth-child(3){background:#28c840}
+.jv-fn { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+#json-pre { padding: 20px; font-family: var(--mono); font-size: 12px; line-height: 1.8;
+  overflow: auto; max-height: 560px; }
+.jk{color:#79b8ff} .js{color:#9ecbff} .jn{color:#f0e68c} .jnu{color:var(--text-dim);font-style:italic} .jb{color:var(--yellow)}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--cyan-dim)}
+
+@media(max-width:600px){
+  .dp-add-row{flex-direction:column}
+  .dp-field-input{flex:unset;width:100%}
+  .dp-add-labels{display:none}
+  .run-bar{flex-direction:column;align-items:stretch}
+  #extract-btn{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+          <path d="M9 12h6M9 16h6M7 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2h-2"/>
+          <path d="M9 4h6a2 2 0 010 4H9a2 2 0 010-4z"/>
+        </svg>
+      </div>
+      <div class="logo-name">Doc<span>Extract</span></div>
+    </div>
+    <span class="badge">Per-Field AI Extraction</span>
+  </header>
+
+  <!-- STEP 1: UPLOAD -->
+  <div class="step-hd">
+    <div class="step-num">1</div>
+    <div>
+      <div class="step-title">Upload Document</div>
+      <div class="step-sub">Scanned &amp; digital PDFs supported</div>
+    </div>
+    <div class="step-line"></div>
+  </div>
+  <div class="card">
+    <div id="drop-zone">
+      <input type="file" id="pdf-input" accept=".pdf"/>
+      <div class="up-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+          <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke="currentColor"/>
+        </svg>
+      </div>
+      <div class="up-title">Drop your PDF here or click to browse</div>
+      <div class="up-sub">Accepts <b>.pdf</b> files</div>
+    </div>
+    <div id="file-info">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <span id="file-name"></span>
+      <span id="file-size" style="color:var(--text-dim)"></span>
+      <span class="rm" onclick="clearFile()">✕</span>
+    </div>
+  </div>
+
+  <!-- STEP 2: DATA POINTS -->
+  <div class="step-hd" style="margin-top:8px">
+    <div class="step-num">2</div>
+    <div>
+      <div class="step-title">Define Data Points &amp; Prompts</div>
+      <div class="step-sub">Each field has its own extraction instruction</div>
+    </div>
+    <div class="step-line"></div>
+  </div>
+  <div class="card">
+
+    <!-- Add row -->
+    <div class="dp-add-labels">
+      <span>Field Name</span>
+      <span>Extraction Prompt / Instruction</span>
+    </div>
+    <div class="dp-add-row">
+      <input type="text" class="dp-field-input" id="new-field"
+        placeholder='e.g. Policy Number' autocomplete="off"/>
+      <textarea class="dp-prompt-input" id="new-prompt" rows="1"
+        placeholder='e.g. Extract only the policy number. Return in format "POL-XXXXXXXX". If not found return null.'></textarea>
+      <button class="dp-add-btn" onclick="addDataPoint()">+ Add Field</button>
+    </div>
+
+    <!-- List -->
+    <div id="dp-list"></div>
+    <div id="dp-empty">No data points added yet — add a field name and its extraction instruction above.</div>
+
+    <!-- Presets -->
+    <div class="presets-row">
+      <span class="presets-label">Quick add:</span>
+      <button class="preset-chip" onclick="addPreset('Policy Number','Extract the policy number exactly as it appears. Return only the policy number string, no surrounding text.')">Policy Number</button>
+      <button class="preset-chip" onclick="addPreset('Name Insured','Extract the primary named insured. Return the full legal name as a string.')">Name Insured</button>
+      <button class="preset-chip" onclick="addPreset('Policy Period','Extract the policy period dates. Return in format MM/DD/YYYY to MM/DD/YYYY.')">Policy Period</button>
+      <button class="preset-chip" onclick="addPreset('Premium','Extract the total premium amount including any breakdowns. Return as a string with dollar sign.')">Premium</button>
+      <button class="preset-chip" onclick="addPreset('Issuing Company','Extract the name of the insurance company issuing this policy.')">Issuing Company</button>
+      <button class="preset-chip" onclick="addPreset('Mailing Address','Extract the mailing address of the named insured. Return as a single formatted address string.')">Mailing Address</button>
+      <button class="preset-chip" onclick="addPreset('Deductible','Extract all deductible amounts and types. Return as a string or object with labels and values.')">Deductible</button>
+      <button class="preset-chip" onclick="addPreset('Endorsements','Extract all endorsements — list changes, additions, deletions, and modifications. Return as an array of strings.')">Endorsements</button>
+      <button class="preset-chip" onclick="addPreset('Forms and Endorsements','Extract all form numbers and titles from the Forms and Endorsements section. Format each as: FormNumber | MM/YY Form Title. Return as array.')">Forms &amp; Endorsements</button>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-bar">
+      <div class="sb-stat">Total Fields: <span class="sv" id="sb-total">0</span></div>
+      <div class="sb-sep"></div>
+      <div class="sb-stat">With Prompts: <span class="sv ok" id="sb-with">0</span></div>
+      <div class="sb-sep"></div>
+      <div class="sb-stat">Missing Prompts: <span class="sv" id="sb-missing">0</span></div>
+    </div>
+  </div>
+
+  <!-- RUN -->
+  <div class="run-bar">
+    <div class="run-info">
+      <div>PDF: <span class="rv" id="run-pdf">—</span></div>
+      <div>Fields: <span class="rv" id="run-fields">0</span> &nbsp;·&nbsp; Backend: <span class="rv">localhost:5000</span></div>
+    </div>
+    <button type="button" id="extract-btn" onclick="runExtraction(event)" disabled>
+      <span class="btn-txt">Run Extraction</span>
+      <span class="btn-spin"></span>
+    </button>
+  </div>
+
+  <div id="prog-msg"></div>
+  <div id="prog-wrap"><div id="prog-bar"></div></div>
+  <div id="error-box"></div>
+
+  <!-- RESULTS -->
+  <div id="results-section">
+    <div class="res-header">
+      <div class="res-title-g">
+        <div class="res-dot"></div>
+        <span class="res-title">Extraction Results</span>
+        <span class="res-count" id="res-count">0 fields</span>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div class="vtoggle">
+          <button class="vt active" id="vt-cards" onclick="switchView('cards')">Cards</button>
+          <button class="vt" id="vt-json" onclick="switchView('json')">JSON</button>
+        </div>
+        <div class="res-acts">
+          <button class="act-btn" onclick="copyJSON()">Copy JSON</button>
+          <button class="act-btn" onclick="downloadJSON()">↓ Download</button>
+        </div>
+      </div>
+    </div>
+    <div id="cards-view"><div id="fields-grid"></div></div>
+    <div id="json-view" style="display:none">
+      <div id="json-viewer">
+        <div class="jvt">
+          <div class="jv-dots"><div class="jv-dot"></div><div class="jv-dot"></div><div class="jv-dot"></div></div>
+          <span class="jv-fn" id="jv-fn">result.json</span><span></span>
+        </div>
+        <pre id="json-pre"></pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+// ── INITIALIZATION ─────────────────────────────────────────────────────────
+console.log('📄 DocExtract app initializing...');
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+const state = { file: null, dataPoints: [], result: null };
+let dpCounter = 0;
+
+// ── FILE ───────────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const pdfInput = document.getElementById('pdf-input');
+
+pdfInput.addEventListener('change', e => { if (e.target.files[0]) setFile(e.target.files[0]); });
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type === 'application/pdf') setFile(f);
+});
+
+function setFile(f) {
+  state.file = f;
+  document.getElementById('file-name').textContent = f.name;
+  document.getElementById('file-size').textContent = `(${(f.size/1024/1024).toFixed(2)} MB)`;
+  document.getElementById('file-info').classList.add('show');
+  document.getElementById('run-pdf').textContent = f.name;
+  updateBtn();
+}
+function clearFile() {
+  state.file = null; pdfInput.value = '';
+  document.getElementById('file-info').classList.remove('show');
+  document.getElementById('run-pdf').textContent = '—';
+  updateBtn();
+}
+
+// ── DATA POINTS ────────────────────────────────────────────────────────────
+const newFieldElem = document.getElementById('new-field');
+if (newFieldElem) {
+  newFieldElem.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addDataPoint(); }
+  });
+}
+
+function addDataPoint(field, prompt) {
+  try {
+    const fieldVal = field || document.getElementById('new-field').value.trim();
+    const promptVal = prompt || document.getElementById('new-prompt').value.trim();
+    
+    if (!fieldVal) {
+      console.warn('addDataPoint: Field name is empty');
+      return;
+    }
+
+    const id = ++dpCounter;
+    state.dataPoints.push({ id, field: fieldVal, prompt: promptVal });
+    console.log(`Added data point: ${fieldVal} (id: ${id})`);
+
+    if (!field) {
+      document.getElementById('new-field').value = '';
+      document.getElementById('new-prompt').value = '';
+      document.getElementById('new-field').focus();
+    }
+
+    renderDataPoints();
+    updateBtn();
+    updateSummary();
+  } catch (err) {
+    console.error('Error in addDataPoint:', err);
+  }
+}
+
+function addPreset(field, prompt) {
+  // don't add duplicate field names
+  if (state.dataPoints.find(d => d.field.toLowerCase() === field.toLowerCase())) return;
+  addDataPoint(field, prompt);
+}
+
+function removeDataPoint(id) {
+  state.dataPoints = state.dataPoints.filter(d => d.id !== id);
+  renderDataPoints();
+  updateBtn();
+  updateSummary();
+}
+
+function updatePrompt(id, val) {
+  const dp = state.dataPoints.find(d => d.id === id);
+  if (dp) { dp.prompt = val; updateSummary(); updateBtn(); }
+}
+
+function updateFieldName(id, val) {
+  const dp = state.dataPoints.find(d => d.id === id);
+  if (dp) { dp.field = val; updateSummary(); }
+}
+
+function toggleExpand(id) {
+  const body = document.getElementById(`dp-body-${id}`);
+  const btn  = document.getElementById(`dp-expand-${id}`);
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+}
+
+function renderDataPoints() {
+  const list = document.getElementById('dp-list');
+  const empty = document.getElementById('dp-empty');
+  list.innerHTML = '';
+
+  if (state.dataPoints.length === 0) {
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  state.dataPoints.forEach((dp, i) => {
+    const hasPrompt = dp.prompt.trim().length > 0;
+    const div = document.createElement('div');
+    div.className = 'dp-item';
+    div.id = `dp-item-${dp.id}`;
+    div.innerHTML = `
+      <div class="dp-item-head">
+        <div class="dp-item-num">${String(i+1).padStart(2,'0')}</div>
+        <div class="dp-item-name">
+          <input value="${esc(dp.field)}" placeholder="Field name"
+            oninput="updateFieldName(${dp.id}, this.value)"
+            onkeydown="if(event.key==='Enter') event.preventDefault()"/>
+        </div>
+        <button class="dp-expand-btn ${hasPrompt?'':'open'}" id="dp-expand-${dp.id}"
+          onclick="toggleExpand(${dp.id})">
+          <span style="font-size:10px;letter-spacing:.5px">${hasPrompt ? 'PROMPT ✓' : 'ADD PROMPT'}</span>
+          <span class="arrow">▾</span>
+        </button>
+        <button class="dp-delete-btn" onclick="removeDataPoint(${dp.id})" title="Remove">✕</button>
+      </div>
+      <div class="dp-item-body ${hasPrompt?'':'open'}" id="dp-body-${dp.id}">
+        <div class="dp-prompt-label">
+          <span class="pl-dot"></span> Extraction Instruction
+        </div>
+        <textarea class="dp-item-textarea"
+          placeholder="Describe exactly how to extract this field — format, fallback rules, where to look in the document, etc."
+          oninput="updatePrompt(${dp.id}, this.value); updateExpandBtn(${dp.id})"
+        >${esc(dp.prompt)}</textarea>
+        <div class="dp-prompt-status">
+          ${hasPrompt
+            ? `<span class="pst-filled">✓ Prompt defined</span>`
+            : `<span class="pst-empty">⚠ No prompt — field will be sent without instruction</span>`
+          }
+        </div>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+function updateExpandBtn(id) {
+  const dp = state.dataPoints.find(d => d.id === id);
+  if (!dp) return;
+  const hasPrompt = dp.prompt.trim().length > 0;
+  const btn = document.getElementById(`dp-expand-${id}`);
+  if (btn) btn.querySelector('span:first-child').textContent = hasPrompt ? 'PROMPT ✓' : 'ADD PROMPT';
+  // update status
+  const body = document.getElementById(`dp-body-${id}`);
+  if (body) {
+    const status = body.querySelector('.dp-prompt-status');
+    if (status) status.innerHTML = hasPrompt
+      ? `<span class="pst-filled">✓ Prompt defined</span>`
+      : `<span class="pst-empty">⚠ No prompt — field will be sent without instruction</span>`;
+  }
+  updateSummary();
+}
+
+function updateSummary() {
+  const total   = state.dataPoints.length;
+  const withP   = state.dataPoints.filter(d => d.prompt.trim()).length;
+  const missing = total - withP;
+  document.getElementById('sb-total').textContent = total;
+  document.getElementById('sb-with').textContent  = withP;
+  const misEl = document.getElementById('sb-missing');
+  misEl.textContent = missing;
+  misEl.className = `sv ${missing > 0 ? 'warn' : 'ok'}`;
+  document.getElementById('run-fields').textContent = total;
+}
+
+// ── VALIDATE & ENABLE BUTTON ───────────────────────────────────────────────
+function updateBtn() {
+  const valid = state.file
+    && state.dataPoints.length > 0
+    && state.dataPoints.every(d => d.field.trim() && d.prompt.trim());
+  document.getElementById('extract-btn').disabled = !valid;
+}
+
+// ── EXTRACTION ────────────────────────────────────────────────────────────
+async function runExtraction(event) {
+  if (event) event.preventDefault();
+  console.log('🚀 runExtraction() called!');
+  try {
+    console.log('📋 Current state:', { file: state.file?.name, dataPoints: state.dataPoints.length });
+    // Check for missing prompts
+    const missing = state.dataPoints.filter(d => !d.prompt.trim());
+    if (missing.length > 0) {
+      showError(`Missing prompts for: ${missing.map(d => `"${d.field}"`).join(', ')}. Please add a prompt for every field.`);
+      return;
+    }
+
+    hideError();
+    setLoading(true);
+    showProg(8, 'Uploading PDF…');
+
+    const payload = state.dataPoints.map(d => ({ field: d.field.trim(), prompt: d.prompt.trim() }));
+
+    const fd = new FormData();
+    fd.append('pdf', state.file);
+    fd.append('data_points', JSON.stringify(payload));
+
+    console.log('📤 Sending extraction request to backend...', { fields: payload.length, file: state.file?.name });
+    showProg(25, 'Extracting text from PDF (OCR if needed)…');
+    
+    let resp;
+    try {
+      resp = await fetch('http://localhost:5000/api/extract', { method: 'POST', body: fd });
+    } catch (fetchErr) {
+      throw new Error(`Network error: ${fetchErr.message}. Is the backend running on localhost:5000?`);
+    }
+    
+    console.log('📥 Response status:', resp.status, resp.statusText);
+    console.log('📥 Response headers:', resp.headers);
+    
+    showProg(70, `Running per-field AI extraction (${payload.length} fields)…`);
+    
+    let data;
+    try {
+      console.log('📥 Parsing JSON response...');
+      data = await resp.json();
+      console.log('📥 JSON parsed successfully');
+    } catch (jsonErr) {
+      console.error('📥 JSON parse error:', jsonErr);
+      throw new Error(`Failed to parse response: ${jsonErr.message}`);
+    }
+    
+    console.log('📊 Response data:', data);
+    console.log('📊 Response data.data:', data.data);
+    
+    if (!resp.ok) {
+      throw new Error(data.error || `Server error ${resp.status}`);
+    }
+    
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    
+    if (!data.data) {
+      throw new Error('Invalid response: no data field returned from server');
+    }
+    
+    console.log('✅ Extraction successful, rendering results...');
+    showProg(100, 'Rendering results...');
+    state.result = data.data;
+    
+    // Wait for DOM to stabilize before rendering
+    await new Promise(r => setTimeout(r, 200));
+    console.log('🎯 Calling renderResults with data');
+    renderResults(data.data);
+    
+    setTimeout(hideProg, 500);
+    
+  } catch (err) {
+    console.error('❌ Extraction error:', err);
+    hideProg();
+    showError(err.message || 'Extraction failed. Is the backend running on localhost:5000?');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function setLoading(on) {
+  const btn = document.getElementById('extract-btn');
+  btn.classList.toggle('loading', on);
+  btn.disabled = on;
+}
+
+// ── PROGRESS ───────────────────────────────────────────────────────────────
+function showProg(pct, msg) {
+  document.getElementById('prog-wrap').classList.add('show');
+  document.getElementById('prog-bar').style.width = pct + '%';
+  document.getElementById('prog-msg').textContent = msg;
+}
+function hideProg() {
+  document.getElementById('prog-wrap').classList.remove('show');
+  document.getElementById('prog-msg').textContent = '';
+}
+
+// ── ERROR ──────────────────────────────────────────────────────────────────
+function showError(msg) { const b = document.getElementById('error-box'); b.textContent = '⚠ '+msg; b.classList.add('show'); }
+function hideError() { document.getElementById('error-box').classList.remove('show'); }
+
+// ── RESULTS ────────────────────────────────────────────────────────────────
+function renderResults(data) {
+  console.log('🎨 renderResults() START');
+  try {
+    console.log('🎨 renderResults() input data:', data);
+    if (!data || typeof data !== 'object') {
+      throw new Error('data is not a valid object: ' + typeof data);
+    }
+    
+    const sec = document.getElementById('results-section');
+    if (!sec) {
+      console.error('❌ results-section element not found!');
+      return;
+    }
+    console.log('✅ Found results-section element');
+    
+    sec.classList.add('show');
+    console.log('✅ Added .show class to results-section');
+    
+    const entries = Object.entries(data);
+    console.log(`📈 Found ${entries.length} result entries:`, entries);
+    
+    document.getElementById('res-count').textContent = `${entries.length} fields`;
+    console.log('✅ Updated res-count');
+    
+    if (state.file) {
+      document.getElementById('jv-fn').textContent = state.file.name.replace('.pdf','') + '_result.json';
+      console.log('✅ Updated jv-fn');
+    }
+
+    const grid = document.getElementById('fields-grid');
+    if (!grid) {
+      console.error('❌ fields-grid element not found!');
+      return;
+    }
+    console.log('✅ Found fields-grid element');
+    
+    grid.innerHTML = '';
+    console.log('✅ Cleared grid HTML');
+    
+    entries.forEach(([k, v], idx) => {
+      try {
+        const c = document.createElement('div');
+        c.className = 'fc';
+        const isNull = v === null || v === undefined;
+        c.innerHTML = `<div class="fc-key">${esc(k)}</div>
+          <div class="fc-val${isNull?' null':''}">${isNull ? 'null' : esc(typeof v === 'object' ? JSON.stringify(v,null,2) : String(v))}</div>`;
+        grid.appendChild(c);
+        console.log(`  ✅ Added field ${idx + 1}/${entries.length}: ${k}`);
+      } catch (fieldErr) {
+        console.error(`  ❌ Error adding field ${k}:`, fieldErr);
+      }
+    });
+    
+    console.log('✅ Grid populated with', grid.children.length, 'items');
+    
+    const jsonStr = JSON.stringify(data, null, 2);
+    document.getElementById('json-pre').innerHTML = highlight(jsonStr);
+    console.log('✅ Updated json-pre');
+    
+    console.log('🎨 renderResults() END - SUCCESS');
+    
+    setTimeout(() => {
+      console.log('🔄 Scrolling to results section');
+      sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  } catch (err) {
+    console.error('❌ Error in renderResults:', err);
+    console.error('❌ Stack:', err.stack);
+  }
+}
+
+function switchView(v) {
+  document.getElementById('cards-view').style.display = v === 'cards' ? '' : 'none';
+  document.getElementById('json-view').style.display  = v === 'json'  ? '' : 'none';
+  document.getElementById('vt-cards').classList.toggle('active', v === 'cards');
+  document.getElementById('vt-json').classList.toggle('active', v === 'json');
+}
+
+function copyJSON() {
+  if (!state.result) return;
+  navigator.clipboard.writeText(JSON.stringify(state.result, null, 2))
+    .then(() => { const b = document.querySelector('.act-btn'); const o = b.textContent; b.textContent='Copied!'; setTimeout(()=>b.textContent=o,1400); });
+}
+function downloadJSON() {
+  if (!state.result) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(state.result,null,2)],{type:'application/json'}));
+  a.download = (state.file?.name?.replace('.pdf','') || 'result') + '_result.json';
+  a.click();
+}
+
+// ── UTILS ──────────────────────────────────────────────────────────────────
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function highlight(json) {
+  return json.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+      let c = 'jn';
+      if (/^"/.test(m)) c = /:$/.test(m) ? 'jk' : 'js';
+      else if (/true|false/.test(m)) c = 'jb';
+      else if (/null/.test(m)) c = 'jnu';
+      return `<span class="${c}">${m}</span>`;
+    });
+}
+
+// ── READY ──────────────────────────────────────────────────────────────────
+console.log('✅ DocExtract app loaded successfully!');
+console.log('Type "addDataPoint(\'Test Field\', \'Test prompt\')" in console to test.');
+</script>
+</body>
+</html>

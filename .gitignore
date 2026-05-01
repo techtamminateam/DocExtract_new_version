@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+backend/venv/
+
+# Environment variables
+.env
+backend/.env
+
+# Logs
+logs/
+
+# Uploaded files
+backend/uploads/
+
+# Node
+node_modules/
+
+# OS files
+.DS_Store
