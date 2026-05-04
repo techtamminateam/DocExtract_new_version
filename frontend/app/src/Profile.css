@@ -1,0 +1,770 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* ── PROFILE PAGE ROOT ── */
+.profile-page {
+  --bg: #F0F4F8;
+  --card-bg: #FFFFFF;
+  --primary: #4A90D9;
+  --primary-dark: #2171B5;
+  --primary-light: #E8F2FB;
+  --accent-blue: #5DADE2;
+  --accent-green: #58D68D;
+  --accent-orange: #F39C12;
+  --text-main: #1A202C;
+  --text-muted: #6B7280;
+  --text-light: #9CA3AF;
+  --border: #E5EBF0;
+  --border-strong: #D1D9E0;
+  --success: #27AE60;
+  --warning: #F39C12;
+  --danger: #E74C3C;
+
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+
+.profile-page *,
+.profile-page *::before,
+.profile-page *::after {
+  box-sizing: border-box;
+}
+
+/* ── TOP NAV BAR ── */
+.profile-top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 40px;
+  background-color: var(--card-bg);
+  border-bottom: 1px solid var(--border-strong);
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.profile-top-nav .search-container {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 6px 12px;
+  width: 300px;
+}
+
+.profile-top-nav .search-icon {
+  color: var(--text-muted);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.profile-top-nav .search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-main);
+  flex: 1;
+}
+
+.profile-top-nav .search-input::placeholder { color: var(--text-light); }
+
+.profile-top-nav .search-shortcut {
+  font-size: 11px;
+  color: var(--text-light);
+  font-family: monospace;
+  background: #fff;
+  border: 1px solid var(--border-strong);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.profile-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.profile-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+  padding: 4px;
+}
+
+.profile-icon-btn:hover { color: var(--text-main); }
+
+.profile-nav-divider {
+  width: 1px;
+  height: 22px;
+  background-color: var(--border-strong);
+  margin: 0 2px;
+}
+
+.profile-user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.profile-user-chip:hover { background: var(--bg); }
+
+.profile-user-chip .chip-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-user-chip .chip-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-user-chip .chip-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.profile-user-chip .chip-role {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── BREADCRUMB ── */
+.profile-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 40px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.profile-breadcrumb a,
+.profile-breadcrumb span {
+  color: var(--text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.profile-breadcrumb a:hover { color: var(--primary); }
+
+.profile-breadcrumb .bc-active {
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: default;
+}
+
+.profile-breadcrumb .bc-sep {
+  color: var(--text-light);
+  font-size: 12px;
+}
+
+/* ── MAIN CONTENT ── */
+.profile-content {
+  flex: 1;
+  padding: 24px 40px 40px;
+  display: grid;
+  grid-template-columns: 300px 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 20px;
+}
+
+/* ── PROFILE HERO CARD (top-left) ── */
+.profile-hero-card {
+  grid-column: 1;
+  grid-row: 1;
+  background: linear-gradient(145deg, #4A90D9 0%, #2C6FAC 60%, #1A4F8A 100%);
+  border-radius: 20px;
+  padding: 28px 24px 24px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(74, 144, 217, 0.3);
+  min-height: 260px;
+}
+
+.profile-hero-card::before {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 50%;
+  top: -60px;
+  right: -60px;
+}
+
+.profile-hero-card::after {
+  content: '';
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 50%;
+  bottom: -30px;
+  left: 20px;
+}
+
+.hero-more-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(255,255,255,0.15);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  transition: background 0.2s;
+  z-index: 1;
+}
+
+.hero-more-btn:hover { background: rgba(255,255,255,0.25); }
+
+.hero-avatar-wrap {
+  position: relative;
+  z-index: 1;
+  margin-top: 8px;
+}
+
+.hero-avatar-ring {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.5);
+  padding: 3px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-avatar {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid white;
+}
+
+.hero-name {
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  z-index: 1;
+  letter-spacing: -0.01em;
+}
+
+.hero-role {
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+  text-align: center;
+  z-index: 1;
+  margin-top: -6px;
+}
+
+.hero-skills-row {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  justify-content: center;
+  z-index: 1;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.15);
+}
+
+.hero-skill-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.hero-skill-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  text-align: center;
+}
+
+.hero-skill-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+}
+
+/* ── LEARNING TIME CHART CARD ── */
+.profile-chart-card {
+  grid-column: 2;
+  grid-row: 1;
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+}
+
+.card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.card-title-row h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.card-info-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.card-expand-btn {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.card-expand-btn:hover { color: var(--text-main); }
+
+/* Radar Chart */
+.radar-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radar-svg {
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+}
+
+/* ── LEGEND CARD ── */
+.profile-legend-card {
+  grid-column: 3;
+  grid-row: 1;
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.legend-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0 0 4px;
+}
+
+.legend-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.legend-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid;
+  flex-shrink: 0;
+}
+
+.legend-dot.dot-dontknow { border-color: #CCC; background: #F5F5F5; }
+.legend-dot.dot-novice { border-color: #90CDF4; background: #EBF8FF; }
+.legend-dot.dot-beginner { border-color: #68D391; background: #F0FFF4; }
+.legend-dot.dot-competent { border-color: #48BB78; background: #C6F6D5; }
+.legend-dot.dot-proficient { border-color: #F6AD55; background: #FEFCBF; }
+.legend-dot.dot-expert { border-color: #E2E8F0; background: #FFF; }
+
+.legend-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.legend-series {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legend-series-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.legend-line {
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── BOTTOM ROW ── */
+/* Learning History */
+.profile-history-card {
+  grid-column: 1;
+  grid-row: 2;
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 0;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.profile-history-card .card-title-row {
+  padding: 20px 20px 16px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  flex: 1;
+}
+
+.history-table thead th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-light);
+  background: #FAFBFC;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.history-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.history-table tbody tr:last-child { border-bottom: none; }
+.history-table tbody tr:hover { background: var(--bg); }
+
+.history-table tbody td {
+  padding: 11px 14px;
+  color: var(--text-main);
+  vertical-align: middle;
+}
+
+.hist-cert-yes {
+  color: #2171B5;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.hist-cert-no {
+  color: var(--text-light);
+  font-size: 12px;
+}
+
+.hist-duration {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+/* ── ACHIEVEMENTS ── */
+.profile-achievements-card {
+  grid-column: 2;
+  grid-row: 2;
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 0;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.profile-achievements-card .card-title-row {
+  padding: 20px 20px 16px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.achievements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.achievement-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.achievement-item:last-child { border-bottom: none; }
+.achievement-item:hover { background: var(--bg); }
+
+.achievement-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.achievement-badge.gold { background: linear-gradient(135deg, #FFD700, #FFA500); box-shadow: 0 2px 8px rgba(255, 165, 0, 0.4); }
+.achievement-badge.silver { background: linear-gradient(135deg, #C0C0C0, #909090); box-shadow: 0 2px 8px rgba(144,144,144,0.35); }
+.achievement-badge.green { background: linear-gradient(135deg, #56ab2f, #a8e063); box-shadow: 0 2px 8px rgba(86,171,47,0.35); }
+.achievement-badge.purple { background: linear-gradient(135deg, #8E2DE2, #4A00E0); box-shadow: 0 2px 8px rgba(142,45,226,0.35); }
+.achievement-badge.blue { background: linear-gradient(135deg, #2193b0, #6dd5ed); box-shadow: 0 2px 8px rgba(33,147,176,0.35); }
+
+.achievement-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.achievement-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+
+.achievement-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.achievement-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.achievement-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.6s ease;
+}
+
+.achievement-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── LEARNING STATISTICS ── */
+.profile-stats-card {
+  grid-column: 3;
+  grid-row: 2;
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 0;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.profile-stats-card .card-title-row {
+  padding: 20px 20px 16px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.stat-table-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: #FAFBFC;
+  border-bottom: 1px solid var(--border);
+}
+
+.stat-table-header span {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.stat-rows {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.stat-row:last-child { border-bottom: none; }
+.stat-row:hover { background: var(--bg); }
+
+.stat-row-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stat-row-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.stat-row-icon.yellow { background: #FEFCBF; }
+.stat-row-icon.purple { background: #EDE9FE; }
+.stat-row-icon.blue { background: #DBEAFE; }
+.stat-row-icon.green { background: #D1FAE5; }
+
+.stat-row-name {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.stat-row-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1200px) {
+  .profile-content {
+    grid-template-columns: 260px 1fr 1fr;
+  }
+}
+
+@media (max-width: 960px) {
+  .profile-content {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+  }
+  .profile-hero-card {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 24px;
+    min-height: auto;
+  }
+  .profile-chart-card { grid-column: 1; grid-row: 2; }
+  .profile-legend-card { grid-column: 2; grid-row: 2; }
+  .profile-history-card { grid-column: 1; grid-row: 3; }
+  .profile-achievements-card { grid-column: 2; grid-row: 3; }
+  .profile-stats-card { grid-column: 1 / -1; grid-row: 4; }
+}
+
+@media (max-width: 640px) {
+  .profile-content {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+  .profile-hero-card,
+  .profile-chart-card,
+  .profile-legend-card,
+  .profile-history-card,
+  .profile-achievements-card,
+  .profile-stats-card {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .profile-top-nav { padding: 14px 20px; }
+  .profile-breadcrumb { padding: 16px 20px 0; }
+}
