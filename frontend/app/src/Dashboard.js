@@ -85,7 +85,7 @@ export function Dashboard({ setActiveNav }) {
       label: "Fields Flagged",
       value: dashboardMetrics.flagged.toLocaleString(),
       icon: AlertTriangle,
-      color: "amber",
+      color: "red",
       change: "Live data",
     },
     {
@@ -139,7 +139,7 @@ export function Dashboard({ setActiveNav }) {
           
           <div className="nav-divider"></div>
           
-          <div className="user-profile">
+          <div className="user-profile" onClick={() => setActiveNav?.("profile")} style={{ cursor: 'pointer' }}>
             <img src="https://i.pravatar.cc/150?img=68" alt="Avatar" className="avatar" />
             <div className="user-info">
               <span className="user-name">Young Alaska</span>

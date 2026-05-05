@@ -28,6 +28,7 @@ class Template(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     template_name = db.Column(db.String(255), unique=True, nullable=False)
     template_content = db.Column(db.Text, nullable=False)
+    data_points = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

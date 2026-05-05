@@ -323,6 +323,13 @@ def extract_all_fields(data_points: list, combined_text: str, gemini_model, sele
 
 
 def get_template(template_name):
+    from models import Template
+    # First, try to fetch from the database so edits take effect
+    template_record = Template.query.filter_by(template_name=template_name).first()
+    if template_record and template_record.template_content:
+        return template_record.template_content
+
+    # Fallback to hardcoded templates if not found in DB
     match template_name:
         case "Health Care Documents":
             return HEALTHCARE_TEMPLATE

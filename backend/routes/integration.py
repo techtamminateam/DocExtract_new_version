@@ -55,7 +55,7 @@ def auth_google():
         "client_id": CLIENT_ID,
         "redirect_uri": REDIRECT_URI,
         "response_type": "code",
-        "scope": "https://www.googleapis.com/auth/drive.readonly",
+        "scope": "https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
         "access_type": "offline",
         "prompt": "consent",
         "state": state
@@ -98,8 +98,26 @@ def auth_callback():
 # 📊 Step 3: Check connection
 @integration_bp.route("/auth/status")
 def auth_status():
+    if "access_token" not in session:
+        return jsonify({"connected": False})
+
+    # Fetch user info
+    user_data = None
+    try:
+        userinfo_url = "https://www.googleapis.com/oauth2/v3/userinfo"
+        print(f"Fetching user info with token: {session['access_token'][:10]}...")
+        res = requests.get(userinfo_url, headers={"Authorization": f"Bearer {session['access_token']}"})
+        if res.ok:
+            user_data = res.json()
+            print(f"User info retrieved successfully: {user_data.get('email')}")
+        else:
+            print(f"Error fetching userinfo: {res.status_code} {res.text}")
+    except Exception as e:
+        print(f"Error fetching userinfo exception: {e}")
+
     return jsonify({
-        "connected": "access_token" in session
+        "connected": True,
+        "user": user_data
     })
 
 # 🔌 Step 3b: Disconnect from Drive

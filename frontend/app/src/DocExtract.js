@@ -5,6 +5,7 @@ import "./DocExtract.css";
 import { History } from "./history";
 import { Dashboard } from "./Dashboard";
 import { Integration } from "./integration";
+import { Profile } from "./Profile";
 
 const BACKEND_URL = "http://localhost:5000/api";
 
@@ -679,6 +680,8 @@ const nextId = () => ++_idCounter;
 function NewExtractionUI({
   file,
   dataPoints,
+  setDataPoints,
+  setPreset,
   newField,
   setNewField,
   newPrompt,
@@ -877,8 +880,6 @@ function NewExtractionUI({
       {/* ══════════════════ NORMAL EXTRACTION SCREEN ══════════════════ */}
       {!verifyMode && (
         <div className="de-wrap">
-
-
           <div className="de-surface-2">
             {/* ── STEP 1: UPLOAD ── */}
             <div className="de-source-switcher">
@@ -966,14 +967,31 @@ function NewExtractionUI({
                     <div className="de-step-title">Define Data Points &amp; Prompts</div>
                     <div className="de-step-sub">Each field has its own extraction instruction</div>
                   </div>
-                  <button
-                    className={`de-extract-btn${loading ? " loading" : ""}`}
-                    onClick={runExtraction}
-                    disabled={!canRun || loading}
-                  >
-                    <span className="de-btn-txt"><Play size={16} className="de-btn-icon" /> Run Extraction</span>
-                    <span className="de-btn-spin" />
-                  </button>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <select
+                      className="de-dp-add-btn"
+                      onChange={handlePresetChange}
+                      value={preset} // Keep it controlled so it always snaps back to the placeholder
+                    >
+                      <option value="Invoice Checking">Invoice Checking</option>
+                      <option value="Financial Statements">Financial Statements</option>
+                      <option value="Legal Documents">Legal Documents</option>
+                      <option value="Health Care Documents">Health Care Documents</option>
+                      <option value="MSA Extraction">MSA Extraction</option>
+                      <option value="SOW Extraction">SOW Extraction</option>
+                    </select>
+                    <button className="de-dp-add-btn" onClick={() => addDataPoint()}>
+                      + Add Field
+                    </button>
+                    <button
+                      className={`de-extract-btn${loading ? " loading" : ""}`}
+                      onClick={runExtraction}
+                      disabled={!canRun || loading}
+                    >
+                      <span className="de-btn-txt"><Play size={16} className="de-btn-icon" /> Run Extraction</span>
+                      <span className="de-btn-spin" />
+                    </button>
+                  </div>
                 </div>
 
               </div>
@@ -1000,22 +1018,6 @@ function NewExtractionUI({
                     value={newPrompt}
                     onChange={(e) => setNewPrompt(e.target.value)}
                   />
-                  <select
-                    className="de-dp-add-btn"
-                    onChange={handlePresetChange}
-                    value={preset} // Keep it controlled so it always snaps back to the placeholder
-                  >
-                    <option value="Invoice Checking">Invoice Checking</option>
-                    <option value="Financial Statements">Financial Statements</option>
-                    <option value="Legal Documents">Legal Documents</option>
-                    <option value="Health Care Documents">Health Care Documents</option>
-                    <option value="MSA Extraction">MSA Extraction</option>
-                    <option value="SOW Extraction">SOW Extraction</option>
-                  </select>
-                  <button className="de-dp-add-btn" onClick={() => addDataPoint()}>
-                    + Add Field
-                  </button>
-
                 </div>
 
                 {/* Data point list */}
@@ -1581,7 +1583,301 @@ function SettingsPage() {
   );
 }
 
+function TemplateEditor({ templateId, onBack, onUseTemplate, initialTab = "overview" }) {
+  const [template, setTemplate] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [editDataPoints, setEditDataPoints] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState(initialTab); // "overview" | "datapoints"
+  const [newField, setNewField] = useState("");
+  const [newPrompt, setNewPrompt] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchTemplate = async () => {
+      if (templateId === 'new') {
+        setTemplate({ template_name: "", template_content: "", data_points: [] });
+        setEditName("");
+        setEditContent("");
+        setEditDataPoints([]);
+        setIsEditing(true);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setError("");
+      try {
+        const response = await fetch(`http://127.0.0.1:5000/api/templates/${templateId}`);
+        if (!response.ok) throw new Error(`Failed to fetch template (${response.status})`);
+        const data = await response.json();
+        if (isMounted) {
+          setTemplate(data);
+          setEditName(data.template_name || data.name || "");
+          setEditContent(data.template_content || "");
+          setEditDataPoints(data.data_points || []);
+        }
+      } catch (err) {
+        if (isMounted) setError(err.message || "Failed to load template.");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchTemplate();
+    return () => { isMounted = false; };
+  }, [templateId]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const url = templateId === 'new' 
+        ? `http://127.0.0.1:5000/api/templates` 
+        : `http://127.0.0.1:5000/api/templates/${templateId}`;
+      
+      const method = templateId === 'new' ? "POST" : "PUT";
+
+      const response = await fetch(url, {
+        method: method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          template_name: editName,
+          template_content: editContent,
+          data_points: editDataPoints
+        }),
+      });
+      if (!response.ok) throw new Error(`Failed to save template (${response.status})`);
+      
+      if (templateId === 'new') {
+        alert("Template created successfully!");
+        onBack(); // Go back to list
+      } else {
+        setTemplate({ ...template, template_name: editName, template_content: editContent, data_points: editDataPoints });
+        setIsEditing(false);
+      }
+    } catch (err) {
+      setError(err.message || "Failed to save template.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addDataPoint = () => {
+    if (!newField.trim()) return;
+    setEditDataPoints([...editDataPoints, { field: newField.trim(), prompt: newPrompt.trim() }]);
+    setNewField("");
+    setNewPrompt("");
+  };
+
+  const removeDataPoint = (idx) => {
+    setEditDataPoints(editDataPoints.filter((_, i) => i !== idx));
+  };
+
+  const updateDp = (idx, key, val) => {
+    const updated = [...editDataPoints];
+    updated[idx] = { ...updated[idx], [key]: val };
+    setEditDataPoints(updated);
+  };
+
+  if (loading) return <div className="templates-state">Loading template details...</div>;
+  if (error) return <div className="templates-state error">{error}</div>;
+  if (!template) return <div className="templates-state error">Template not found.</div>;
+
+  return (
+    <div className="templates-shell" style={{ animation: 'fadeIn 0.3s ease' }}>
+      <div className="template-editor-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <button
+          className="btn-ghost"
+          onClick={onBack}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-dim)', padding: '8px 12px', borderRadius: 8 }}
+        >
+          &larr; Back to Templates
+        </button>
+        <div className="template-editor-actions" style={{ display: 'flex', gap: 12 }}>
+          {isEditing ? (
+            <>
+              <div className="de-vtoggle" style={{ marginRight: 12 }}>
+                <button
+                  className={`de-vt${activeTab === "overview" ? " active" : ""}`}
+                  onClick={() => setActiveTab("overview")}
+                >
+                  Overview
+                </button>
+                <button
+                  className={`de-vt${activeTab === "datapoints" ? " active" : ""}`}
+                  onClick={() => setActiveTab("datapoints")}
+                >
+                  Data Points
+                </button>
+              </div>
+              <button className="btn-ghost" onClick={() => {
+                if (templateId === 'new') {
+                  onBack();
+                  return;
+                }
+                setIsEditing(false);
+                setEditName(template.template_name || template.name || "");
+                setEditContent(template.template_content || "");
+                setEditDataPoints(template.data_points || []);
+              }} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8 }}>Cancel</button>
+              <button className="btn-primary" onClick={handleSave} disabled={saving} style={{ background: 'var(--cyan)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 500, boxShadow: '0 2px 8px var(--cyan-glow)' }}>
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn-ghost" onClick={() => { setIsEditing(true); setActiveTab("overview"); }} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }}>Edit Template</button>
+              <button className="btn-ghost" onClick={() => { setIsEditing(true); setActiveTab("datapoints"); }} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }}>Add Data Points</button>
+              <button className="btn-primary" onClick={() => onUseTemplate(template)} style={{ background: 'var(--cyan)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 500, boxShadow: '0 2px 8px var(--cyan-glow)' }}>
+                Use Template
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="template-editor-body" style={{ padding: 32, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+        {isEditing ? (
+          activeTab === "overview" ? (
+            <div className="template-edit-form" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, fontSize: 13, color: 'var(--text-dim)' }}>Template Name</label>
+                <input
+                  className="de-dp-field-input"
+                  style={{ width: '100%', padding: '12px 16px', fontSize: 16, fontWeight: 600, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)' }}
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, fontSize: 13, color: 'var(--text-dim)' }}>Extraction Prompt (Content)</label>
+                <textarea
+                  className="de-dp-prompt-input"
+                  style={{ width: '100%', minHeight: 400, padding: 16, fontFamily: 'var(--mono)', fontSize: 13, lineHeight: 1.6, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', resize: 'vertical' }}
+                  value={editContent}
+                  onChange={e => setEditContent(e.target.value)}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="template-datapoints-edit">
+              <div className="de-step-hd" style={{ marginBottom: 20 }}>
+                <div className="de-step-title">Configure Template Data Points</div>
+                <div className="de-step-sub">Define the fields and specific instructions for this template</div>
+              </div>
+
+              <div className="de-dp-add-row" style={{ marginBottom: 24 }}>
+                <input
+                  type="text"
+                  className="de-dp-field-input"
+                  placeholder="Field Name (e.g. Total Amount)"
+                  value={newField}
+                  onChange={e => setNewField(e.target.value)}
+                />
+                <textarea
+                  className="de-dp-prompt-input"
+                  placeholder="Extraction Instruction..."
+                  rows={1}
+                  value={newPrompt}
+                  onChange={e => setNewPrompt(e.target.value)}
+                />
+                <button className="de-dp-add-btn" onClick={addDataPoint} style={{ height: 'fit-content' }}>Add</button>
+              </div>
+
+              <div className="de-dp-list">
+                {editDataPoints.map((dp, idx) => (
+                  <div key={idx} className="de-dp-item" style={{ marginBottom: 12 }}>
+                    <div className="de-dp-item-head">
+                      <div className="de-dp-item-num">{String(idx + 1).padStart(2, '0')}</div>
+                      <div className="de-dp-item-name">
+                        <input
+                          value={dp.field}
+                          onChange={e => updateDp(idx, 'field', e.target.value)}
+                        />
+                      </div>
+                      <button className="de-dp-delete-btn" onClick={() => removeDataPoint(idx)}>✕</button>
+                    </div>
+                    <div className="de-dp-item-body open">
+                      <textarea
+                        className="de-dp-item-textarea"
+                        value={dp.prompt}
+                        onChange={e => updateDp(idx, 'prompt', e.target.value)}
+                        placeholder="Instruction..."
+                      />
+                    </div>
+                  </div>
+                ))}
+                {editDataPoints.length === 0 && (
+                  <div className="de-dp-empty">No data points defined for this template.</div>
+                )}
+              </div>
+            </div>
+          )
+        ) : (
+          <div className="template-view">
+            <h2 style={{ marginBottom: 8, fontSize: 24, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+              {template.template_name || template.name || "Untitled Template"}
+            </h2>
+            <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 24 }}>
+              Extraction configuration rules and prompt instructions.
+            </p>
+            
+            <div className="template-tabs" style={{ display: 'flex', gap: 24, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
+               <button 
+                className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+                onClick={() => setActiveTab('overview')}
+                style={{ padding: '8px 4px', background: 'none', border: 'none', borderBottom: activeTab === 'overview' ? '2px solid var(--cyan)' : '2px solid transparent', color: activeTab === 'overview' ? 'var(--cyan)' : 'var(--text-dim)', cursor: 'pointer', fontWeight: 500 }}
+               >Overview</button>
+               <button 
+                className={`tab-btn ${activeTab === 'datapoints' ? 'active' : ''}`}
+                onClick={() => setActiveTab('datapoints')}
+                style={{ padding: '8px 4px', background: 'none', border: 'none', borderBottom: activeTab === 'datapoints' ? '2px solid var(--cyan)' : '2px solid transparent', color: activeTab === 'datapoints' ? 'var(--cyan)' : 'var(--text-dim)', cursor: 'pointer', fontWeight: 500 }}
+               >Data Points ({editDataPoints.length})</button>
+            </div>
+
+            {activeTab === 'overview' ? (
+              <div className="template-content-preview" style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: 24, borderRadius: 12, overflowX: 'auto' }}>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordWrap: 'break-word', fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
+                  {template.template_content}
+                </pre>
+              </div>
+            ) : (
+              <div className="template-datapoints-preview">
+                <div className="de-dp-list">
+                  {editDataPoints.map((dp, idx) => (
+                    <div key={idx} className="de-dp-item" style={{ marginBottom: 12, opacity: 0.9 }}>
+                      <div className="de-dp-item-head">
+                        <div className="de-dp-item-num">{String(idx + 1).padStart(2, '0')}</div>
+                        <div className="de-dp-item-name">
+                          <div style={{ padding: '8px 12px', fontWeight: 500 }}>{dp.field}</div>
+                        </div>
+                      </div>
+                      <div className="de-dp-item-body open">
+                        <div style={{ padding: '12px', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
+                          {dp.prompt || <span style={{ fontStyle: 'italic', color: 'var(--text-dim)' }}>No instruction provided.</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {editDataPoints.length === 0 && (
+                    <div className="de-dp-empty">No data points defined.</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TemplatesPage({ onUseTemplate }) {
+  const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+  const [initialTab, setInitialTab] = useState("overview");
   const [templates, setTemplates] = useState([]);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [templatesError, setTemplatesError] = useState("");
@@ -1642,13 +1938,26 @@ function TemplatesPage({ onUseTemplate }) {
   };
 
   const getRelatedWords = (template, fields) => {
+    if (fields && fields.length > 0) {
+      return fields.slice(0, 6);
+    }
     const fromName = String(template.name || template.template_name || "")
       .split(/[\s-_]+/)
       .map((w) => w.trim())
       .filter((w) => w.length > 2);
-    const fromFields = fields.slice(0, 4);
-    return [...new Set([...fromName, ...fromFields])].slice(0, 6);
+    return [...new Set(fromName)].slice(0, 6);
   };
+
+  if (selectedTemplateId) {
+    return (
+      <TemplateEditor
+        templateId={selectedTemplateId}
+        initialTab={initialTab}
+        onBack={() => { setSelectedTemplateId(null); setInitialTab("overview"); }}
+        onUseTemplate={onUseTemplate}
+      />
+    );
+  }
 
   return (
     <div className="templates-shell">
@@ -1657,7 +1966,7 @@ function TemplatesPage({ onUseTemplate }) {
           <h1>Templates</h1>
           <p>Reusable extraction configurations for common document types</p>
         </div>
-        <button className="templates-new-btn">
+        <button className="templates-new-btn" onClick={() => setSelectedTemplateId('new')}>
           <Plus size={14} />
           New Template
         </button>
@@ -1679,7 +1988,7 @@ function TemplatesPage({ onUseTemplate }) {
               <div
                 className="template-card"
                 key={template.id || template.name || idx}
-                onClick={() => onUseTemplate?.(template)}
+                onClick={() => setSelectedTemplateId(template.id)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
@@ -1707,14 +2016,27 @@ function TemplatesPage({ onUseTemplate }) {
                 <div className="template-card-foot">
                   <span><Hash size={12} /> {fields.length} fields</span>
                   <span><Clock3 size={12} /> {getUpdatedText(template)}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onUseTemplate?.(template);
-                    }}
-                  >
-                    Use
-                  </button>
+                  <div className="template-card-actions">
+                    <button
+                      className="template-card-edit-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInitialTab("datapoints");
+                        setSelectedTemplateId(template.id);
+                      }}
+                    >
+                      + Data Points
+                    </button>
+                    <button
+                      className="template-card-use-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUseTemplate?.(template);
+                      }}
+                    >
+                      Use
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -2264,6 +2586,8 @@ export default function DocExtract() {
           <NewExtractionUI
             file={file}
             dataPoints={dataPoints}
+            setDataPoints={setDataPoints}
+            setPreset={setPreset}
             newField={newField}
             setNewField={setNewField}
             newPrompt={newPrompt}
@@ -2358,6 +2682,11 @@ export default function DocExtract() {
         {/* Settings - Empty for now */}
         {activeNav === "settings" && (
           <SettingsPage />
+        )}
+
+        {/* Profile */}
+        {activeNav === "profile" && (
+          <Profile />
         )}
       </div> {/* end de-main */}
     </div>
