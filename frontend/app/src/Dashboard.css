@@ -270,6 +270,11 @@
     height: 16px;
   }
 
+  .icon-box.blue svg { color: #265cb3; }
+  .icon-box.green svg { color: #059669; }
+  .icon-box.red svg { color: var(--danger); }
+  .icon-box.gray svg { color: var(--text-light); }
+
   .stat-label {
     font-size: 14px;
     font-weight: 500;
@@ -415,8 +420,8 @@
   }
 
   .recent-item>svg {
-    color: var(--primary);
-    background: var(--primary-light);
+    color: #059669;
+    background: #ecfdf5;
     width: 20px;
     height: 20px;
     padding: 8px;

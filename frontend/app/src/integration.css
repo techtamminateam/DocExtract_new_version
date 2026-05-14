@@ -1,50 +1,48 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-
 /* ─── Tokens ─────────────────────────────────────────────── */
 :root {
   /* surfaces */
-  --bg:          #ffffff;
-  --surface:     #eeeeee;
-  --surface-2:   #e2e6ef;
-  --surface-3:   #181f30;
+  --bg:          #F8FAFC;
+  --surface:     #FFFFFF;
+  --surface-2:   #F1F5F9;
+  --surface-3:   #E2E8F0;
 
   /* borders */
-  --border:      #b0b3ba;
-  --border2:     #9197aa;
-  --border-glow: #265cb340;
+  --border:      #E2E8F0;
+  --border2:     #CBD5E1;
+  --border-glow: rgba(99, 102, 241, 0.15);
 
-  /* accent (blue) */
-  --accent:      #265cb3;
-  --accent-dim:  #265cb312;
-  --accent-mid:  #265cb340;
+  /* accent (indigo) */
+  --accent:      #6366F1;
+  --accent-dim:  #EEF2FF;
+  --accent-mid:  rgba(99, 102, 241, 0.4);
 
   /* semantic colours */
-  --green:       #059669;
-  --red:         #fe0000;
-  --yellow:      #ffc94d;
-  --purple:      #b06aff;
+  --green:       #10B981;
+  --red:         #EF4444;
+  --yellow:      #F59E0B;
+  --purple:      #8B5CF6;
 
   /* text */
-  --text:        #050505;
-  --text-hi:     #0d1117;
-  --text-mid:    #5e6f88;
-  --text-lo:     #9498a0;
-  --text-dim:    #5e6f88;
-  --text-muted:  #9498a0;
+  --text:        #111827;
+  --text-hi:     #111827;
+  --text-mid:    #6B7280;
+  --text-lo:     #9CA3AF;
+  --text-dim:    #6B7280;
+  --text-muted:  #9CA3AF;
 
   /* typography */
-  --font-sans:   'DM Sans', system-ui, sans-serif;
-  --font-mono:   'DM Mono', monospace;
+  --font-sans:   'Inter', system-ui, sans-serif;
+  --font-mono:   'Inter', system-ui, sans-serif;
 
   /* shape */
-  --r:           6px;
-  --r-lg:        12px;
-  --radius-sm:   8px;
-  --radius-xs:   6px;
+  --r:           8px;
+  --r-lg:        16px;
+  --radius-sm:   12px;
+  --radius-xs:   8px;
 
   /* misc */
-  --transition:  0.18s ease;
-  --shadow-card: 0 2px 12px #00000014, 0 1px 3px #0000000a;
+  --transition:  0.2s ease;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 12px rgba(0, 0, 0, 0.02);
 }
 
 /* ─── Reset / Base ────────────────────────────────────────── */
@@ -62,7 +60,7 @@
   align-items: center;
   justify-content: center;
   gap: 16px;
-  background: var(--surface);
+  background: var(--bg);
   font-family: var(--font-sans);
   padding: 32px 16px;
 }
@@ -71,12 +69,13 @@
 .provider-tabs {
   display: flex;
   gap: 6px;
-  background: var(--bg);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: 5px;
+  padding: 6px;
   width: 100%;
   max-width: 580px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .provider-tab {
@@ -85,28 +84,28 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 9px 14px;
+  padding: 10px 14px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-mid);
   cursor: pointer;
   transition: all var(--transition);
 }
 
 .provider-tab:hover:not(.active) {
-  background: var(--surface);
+  background: var(--surface-2);
   color: var(--text-hi);
 }
 
 .provider-tab.active {
-  background: var(--surface);
-  border-color: var(--border);
+  background: var(--accent-dim);
+  border-color: var(--accent-mid);
   color: var(--accent);
-  box-shadow: 0 1px 4px #00000014;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .tab-logo {
@@ -119,7 +118,7 @@
 .drive-card {
   width: 100%;
   max-width: 580px;
-  background: var(--bg);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-card);
@@ -149,21 +148,22 @@
 }
 
 .drive-icon-wrap {
-  width: 44px;
-  height: 44px;
-  background: var(--accent-dim);
-  border: 1px solid var(--accent-mid);
+  width: 48px;
+  height: 48px;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .drive-icon-wrap img {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   object-fit: contain;
 }
 
@@ -191,19 +191,19 @@
   border-radius: 999px;
   font-size: 11.5px;
   font-weight: 500;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
 .status-badge.connected {
-  background: #d1fae512;
-  border: 1px solid #05966930;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
   color: var(--green);
 }
 
 .status-badge.disconnected {
-  background: #f4f5f7;
+  background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text-mid);
 }
@@ -274,23 +274,23 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
+  padding: 10px 24px;
   background: var(--accent);
   color: #fff;
   border: none;
   border-radius: var(--radius-sm);
   font-family: var(--font-sans);
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
-  box-shadow: 0 2px 10px var(--accent-mid);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #1e4d9e;
+  opacity: 0.9;
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px var(--accent-mid);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
 }
 
 .btn-primary:active:not(:disabled) {
@@ -307,14 +307,14 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 13px;
+  padding: 8px 16px;
   background: transparent;
   color: var(--text-mid);
   border: 1px solid var(--border);
   border-radius: var(--radius-xs);
   font-family: var(--font-sans);
-  font-size: 12.5px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   transition: all var(--transition);
 }

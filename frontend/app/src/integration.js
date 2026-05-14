@@ -41,6 +41,7 @@ function DrivePanel({ provider }) {
   const [error,      setError]      = useState("");
   const [toast,      setToast]      = useState(null);
   const [extracting, setExtracting] = useState(null);
+  const [user,       setUser]       = useState(null);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -54,8 +55,14 @@ function DrivePanel({ provider }) {
       const res = await fetch(provider.statusUrl, { credentials: "include" });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      if (data.connected) { setConnected(true); fetchFiles(); }
-      else setConnected(false);
+      if (data.connected) { 
+        setConnected(true); 
+        setUser(data.user || null);
+      }
+      else {
+        setConnected(false);
+        setUser(null);
+      }
     } catch {
       setError("Could not verify connection status.");
     }
@@ -89,6 +96,7 @@ function DrivePanel({ provider }) {
       if (!res.ok) throw new Error();
       setConnected(false);
       setFiles([]);
+      setUser(null);
       showToast(`Disconnected from ${provider.label}`);
     } catch {
       setError("Failed to disconnect.");
@@ -153,61 +161,23 @@ function DrivePanel({ provider }) {
             </button>
           </div>
         ) : (
-          <div className="files-section">
-            <div className="files-toolbar">
-              <span className="files-label">PDF Files</span>
-              {!loading && files.length > 0 && (
-                <span className="files-count">
-                  {files.length} file{files.length !== 1 ? "s" : ""}
-                </span>
-              )}
-              <button
-                className="btn-ghost"
-                onClick={fetchFiles}
-                disabled={loading}
-              >
-                Refresh
-              </button>
-            </div>
-
-            {loading ? (
-              <div className="state-loading">
-                <div className="spinner" />
-                Fetching files…
-              </div>
-            ) : files.length === 0 ? (
-              <div className="state-empty">
-                No PDF files found in your {provider.label}
-              </div>
+          <div className="connect-state">
+            {user && user.picture ? (
+              <img 
+                src={user.picture} 
+                alt="Profile" 
+                style={{ width: 80, height: 80, borderRadius: '50%', marginBottom: 16, border: '3px solid #e2e8f0' }} 
+              />
             ) : (
-              <ul className="file-list">
-                {files.map((file) => (
-                  <li key={file.id} className="file-item">
-                    <div className="file-icon">📄</div>
-                    <div className="file-info">
-                      <div className="file-name" title={file.name}>
-                        {file.name}
-                      </div>
-                      <div className="file-meta">{file.id}</div>
-                    </div>
-                    <button
-                      className="btn-extract"
-                      onClick={() => handleExtract(file.id, file.name)}
-                      disabled={extracting !== null}
-                    >
-                      {extracting === file.id ? (
-                        <>
-                          <div className="spinner"
-                            style={{ width: 11, height: 11, borderWidth: 1.5 }}
-                          />
-                          Extracting…
-                        </>
-                      ) : "Extract"}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <div className="connect-illustration" style={{ opacity: 0.5 }} />
             )}
+            <div className="connect-text">
+              <h3>{user && user.email ? user.email : `${provider.label} Connected`}</h3>
+              {user && user.name && <p style={{ fontWeight: 600, color: '#334155', margin: '4px 0 8px' }}>{user.name}</p>}
+              <p>
+                Your account is successfully connected. Please go to the New Extraction page to browse and select your files.
+              </p>
+            </div>
           </div>
         )}
       </div>
