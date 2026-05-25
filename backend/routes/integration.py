@@ -115,6 +115,26 @@ def auth_status():
     except Exception as e:
         print(f"Error fetching userinfo exception: {e}")
 
+    # Check if we can get credentials (this will verify if we have access token)
+    try:
+        creds = get_drive_credentials()
+        # Verify if we have Drive scope by calling files.list with pageSize=1
+        test_res = requests.get(
+            "https://www.googleapis.com/drive/v3/files",
+            headers={"Authorization": f"Bearer {creds.token}"},
+            params={"pageSize": 1}
+        )
+        if not test_res.ok:
+            print(f"Drive scope check failed: {test_res.status_code} {test_res.text}")
+            if test_res.status_code in [403, 401]:
+                # Clear session so they can re-authenticate
+                session.pop("access_token", None)
+                session.pop("refresh_token", None)
+                return jsonify({"connected": False, "error": "insufficient_scopes"})
+    except Exception as e:
+        print(f"Error checking credentials or Drive scope: {e}")
+        return jsonify({"connected": False})
+
     return jsonify({
         "connected": True,
         "user": user_data

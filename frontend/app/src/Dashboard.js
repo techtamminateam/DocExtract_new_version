@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   FileText,
   CheckCircle,
@@ -15,11 +15,14 @@ import {
   ChevronDown,
   Filter,
   Upload,
+  Eye,
+  Download,
+  Trash2,
 } from "lucide-react";
-import { exportToExcel, deletePdf, ReviewView } from "./history";
+import { exportToExcel, exportAllToExcel, deletePdf, ReviewView } from "./history";
 import "./Dashboard.css";
 
-export function Dashboard({ setActiveNav }) {
+export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], setNotifications }) {
   const [historyItems, setHistoryItems] = useState([]);
   const [reviewItem, setReviewItem] = useState(null);
   const [recentPage, setRecentPage] = useState(1);
@@ -29,6 +32,30 @@ export function Dashboard({ setActiveNav }) {
     flagged: 0,
     pending: 0,
   });
+
+  // Date range filter state
+  const [dateRange, setDateRange] = useState({ type: "all", start: null, end: null, label: "All Time" });
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+
+  // Status and template filter state
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [templateFilter, setTemplateFilter] = useState("all");
+
+  // Interval (frequency) state
+  const [interval, setIntervalVal] = useState("Monthly");
+
+  // Dropdown visibility state
+  const [showNotifPopup, setShowNotifPopup] = useState(false);
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [showIntervalDropdown, setShowIntervalDropdown] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
+  // Refs for click-outside detection
+  const bellRef = useRef(null);
+  const dateRef = useRef(null);
+  const intervalRef = useRef(null);
+  const filterRef = useRef(null);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -64,43 +91,94 @@ export function Dashboard({ setActiveNav }) {
     };
 
     fetchDashboardMetrics();
-  }, []);
+  }, [dateRange]);
+
+  // Client-side filtering of extractions history list
+  const filteredHistory = historyItems.filter((item) => {
+    // 1. Date Range Filter
+    if (item.timestamp) {
+      const itemDate = new Date(item.timestamp);
+      if (dateRange.start && itemDate < dateRange.start) return false;
+      if (dateRange.end && itemDate > dateRange.end) return false;
+    }
+
+    // 2. Status Filter
+    const totalFields = item.data_points?.length || 0;
+    const approved = Object.values(item.results || {}).filter(
+      (v) => v !== null && v !== undefined
+    ).length;
+    const isCompleted = totalFields > 0 && approved === totalFields;
+
+    if (statusFilter === "completed" && !isCompleted) return false;
+    if (statusFilter === "pending" && isCompleted) return false;
+
+    // 3. Template Filter
+    if (templateFilter !== "all" && item.template_name !== templateFilter) return false;
+
+    return true;
+  });
+
+  // Unique template names for the filter dropdown
+  const uniqueTemplates = Array.from(
+    new Set(historyItems.map((item) => item.template_name).filter(Boolean))
+  );
 
   const stats = [
     {
       label: "Total Extractions",
-      value: historyItems.length.toLocaleString(),
+      value: filteredHistory.length.toLocaleString(),
       icon: FileText,
       color: "blue",
-      change: "Live data",
+      change: interval === "Daily" ? "vs Yesterday" : interval === "Weekly" ? "vs Last Week" : interval === "Yearly" ? "vs Last Year" : "vs Last Month",
     },
     {
       label: "Fields Approved",
       value: dashboardMetrics.approved.toLocaleString(),
       icon: CheckCircle,
       color: "green",
-      change: "Live data",
+      change: interval === "Daily" ? "vs Yesterday" : interval === "Weekly" ? "vs Last Week" : interval === "Yearly" ? "vs Last Year" : "vs Last Month",
     },
     {
       label: "Fields Flagged",
       value: dashboardMetrics.flagged.toLocaleString(),
       icon: AlertTriangle,
       color: "red",
-      change: "Live data",
+      change: interval === "Daily" ? "vs Yesterday" : interval === "Weekly" ? "vs Last Week" : interval === "Yearly" ? "vs Last Year" : "vs Last Month",
     },
     {
       label: "Pending Review",
       value: dashboardMetrics.pending.toLocaleString(),
       icon: Clock,
       color: "gray",
-      change: "Live data",
+      change: interval === "Daily" ? "vs Yesterday" : interval === "Weekly" ? "vs Last Week" : interval === "Yearly" ? "vs Last Year" : "vs Last Month",
     },
   ];
 
   const recentPerPage = 10;
-  const recentTotalPages = Math.max(1, Math.ceil(historyItems.length / recentPerPage));
+  const recentTotalPages = Math.max(1, Math.ceil(filteredHistory.length / recentPerPage));
   const recentStart = (recentPage - 1) * recentPerPage;
-  const recentItems = historyItems.slice(recentStart, recentStart + recentPerPage);
+  const recentItems = filteredHistory.slice(recentStart, recentStart + recentPerPage);
+
+  const unreadCount = notifications.filter((n) => n.unread).length;
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (bellRef.current && !bellRef.current.contains(e.target)) {
+        setShowNotifPopup(false);
+      }
+      if (dateRef.current && !dateRef.current.contains(e.target)) {
+        setShowDateDropdown(false);
+      }
+      if (intervalRef.current && !intervalRef.current.contains(e.target)) {
+        setShowIntervalDropdown(false);
+      }
+      if (filterRef.current && !filterRef.current.contains(e.target)) {
+        setShowFilterDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     setRecentPage((prev) => Math.min(prev, recentTotalPages));
@@ -118,6 +196,33 @@ export function Dashboard({ setActiveNav }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const handleCustomDateApply = (e) => {
+    e.preventDefault();
+    if (customStartDate && customEndDate) {
+      const start = new Date(customStartDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(customEndDate);
+      end.setHours(23, 59, 59, 999);
+      
+      setDateRange({
+        type: "custom",
+        start,
+        end,
+        label: "Custom Range"
+      });
+      setShowDateDropdown(false);
+    }
+  };
+
+  const getDateRangeButtonLabel = () => {
+    if (dateRange.type === "all") return "All Time";
+    if (dateRange.start && dateRange.end) {
+      const options = { month: "short", day: "numeric" };
+      return `${dateRange.start.toLocaleDateString("en-US", options)} - ${dateRange.end.toLocaleDateString("en-US", options)}`;
+    }
+    return dateRange.label;
+  };
+
   if (reviewItem) {
     return <ReviewView item={reviewItem} onBack={() => setReviewItem(null)} />;
   }
@@ -134,7 +239,53 @@ export function Dashboard({ setActiveNav }) {
         
         <div className="top-nav-actions">
           <button className="icon-btn"><Gift size={16} /></button>
-          <button className="icon-btn"><Bell size={16} /></button>
+          <div className="bell-container" ref={bellRef}>
+            <button className="icon-btn" onClick={() => setShowNotifPopup(!showNotifPopup)} aria-label="Notifications">
+              <Bell size={16} />
+              {unreadCount > 0 && <span className="bell-red-dot" />}
+            </button>
+            {showNotifPopup && (
+              <div className="bell-notifications-popup">
+                <div className="popup-header">
+                  <h4>Notifications</h4>
+                  {unreadCount > 0 && <span className="unread-badge">{unreadCount} new</span>}
+                </div>
+                <div className="popup-body">
+                  {notifications.length === 0 ? (
+                    <div className="popup-empty-state">No notifications.</div>
+                  ) : (
+                    notifications.slice(0, 3).map((notif) => (
+                      <div
+                        key={notif.id}
+                        className={`popup-item ${notif.unread ? 'unread' : ''}`}
+                        onClick={() => {
+                          setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, unread: false } : n));
+                        }}
+                        title="Click to mark as read"
+                      >
+                        <div className="popup-item-top">
+                          <span className="popup-item-title">{notif.title}</span>
+                          <span className="popup-item-time">{notif.time}</span>
+                        </div>
+                        <p className="popup-item-desc">{notif.description}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="popup-footer-btn"
+                  onClick={() => {
+                    setShowNotifPopup(false);
+                    setActiveNav("settings");
+                    setSettingsTab("Notifications");
+                  }}
+                >
+                  View all notifications
+                </button>
+              </div>
+            )}
+          </div>
           <button className="icon-btn" style={{ border: '1px solid var(--border-strong)', borderRadius: '50%', width: '28px', height: '28px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={14} /></button>
           
           <div className="nav-divider"></div>
@@ -157,19 +308,135 @@ export function Dashboard({ setActiveNav }) {
           <h1>Dashboard</h1>
           
           <div className="header-actions">
-            <button className="header-btn">
-              <Calendar size={14} />
-              Oct 18 - Nov 18
-            </button>
-            <button className="header-btn">
-              Monthly
-              <ChevronDown size={14} />
-            </button>
-            <button className="header-btn">
-              <Filter size={14} />
-              Filter
-            </button>
-            <button className="header-btn">
+            {/* 1. Date Range Picker */}
+            <div className="dropdown-action-container" ref={dateRef}>
+              <button className={`header-btn ${dateRange.type !== 'all' ? 'active' : ''}`} onClick={() => {
+                setShowDateDropdown(!showDateDropdown);
+                setShowIntervalDropdown(false);
+                setShowFilterDropdown(false);
+              }}>
+                <Calendar size={14} />
+                {getDateRangeButtonLabel()}
+              </button>
+              {showDateDropdown && (
+                <div className="dashboard-dropdown-popup date-popup">
+                  <button className={dateRange.type === 'all' ? 'active' : ''} onClick={() => {
+                    setDateRange({ type: "all", start: null, end: null, label: "All Time" });
+                    setShowDateDropdown(false);
+                  }}>All Time</button>
+                  <button className={dateRange.type === '7days' ? 'active' : ''} onClick={() => {
+                    const start = new Date();
+                    start.setDate(start.getDate() - 7);
+                    start.setHours(0,0,0,0);
+                    setDateRange({ type: "7days", start, end: new Date(), label: "Last 7 Days" });
+                    setShowDateDropdown(false);
+                  }}>Last 7 Days</button>
+                  <button className={dateRange.type === '30days' ? 'active' : ''} onClick={() => {
+                    const start = new Date();
+                    start.setDate(start.getDate() - 30);
+                    start.setHours(0,0,0,0);
+                    setDateRange({ type: "30days", start, end: new Date(), label: "Last 30 Days" });
+                    setShowDateDropdown(false);
+                  }}>Last 30 Days</button>
+                  <button className={dateRange.type === 'thismonth' ? 'active' : ''} onClick={() => {
+                    const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+                    setDateRange({ type: "thismonth", start, end: new Date(), label: "This Month" });
+                    setShowDateDropdown(false);
+                  }}>This Month</button>
+                  <div className="dropdown-custom-range">
+                    <div className="custom-range-title">Custom Range</div>
+                    <form onSubmit={handleCustomDateApply}>
+                      <div className="custom-range-inputs">
+                        <label>
+                          <span>Start:</span>
+                          <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} required />
+                        </label>
+                        <label>
+                          <span>End:</span>
+                          <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} required />
+                        </label>
+                      </div>
+                      <button type="submit" className="custom-range-btn">Apply Range</button>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Frequency/Interval Dropdown */}
+            <div className="dropdown-action-container" ref={intervalRef}>
+              <button className="header-btn" onClick={() => {
+                setShowIntervalDropdown(!showIntervalDropdown);
+                setShowDateDropdown(false);
+                setShowFilterDropdown(false);
+              }}>
+                {interval}
+                <ChevronDown size={14} />
+              </button>
+              {showIntervalDropdown && (
+                <div className="dashboard-dropdown-popup">
+                  {["Daily", "Weekly", "Monthly", "Yearly"].map((item) => (
+                    <button
+                      key={item}
+                      className={interval === item ? 'active' : ''}
+                      onClick={() => {
+                        setIntervalVal(item);
+                        setShowIntervalDropdown(false);
+                      }}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 3. Filter Dropdown */}
+            <div className="dropdown-action-container" ref={filterRef}>
+              <button className={`header-btn ${(statusFilter !== 'all' || templateFilter !== 'all') ? 'active' : ''}`} onClick={() => {
+                setShowFilterDropdown(!showFilterDropdown);
+                setShowDateDropdown(false);
+                setShowIntervalDropdown(false);
+              }}>
+                <Filter size={14} />
+                Filter {(statusFilter !== 'all' || templateFilter !== 'all') && <span className="active-filter-dot" />}
+              </button>
+              {showFilterDropdown && (
+                <div className="dashboard-dropdown-popup filter-popup">
+                  <div className="filter-section">
+                    <div className="filter-section-title">Status</div>
+                    <button className={statusFilter === 'all' ? 'active' : ''} onClick={() => setStatusFilter("all")}>All Statuses</button>
+                    <button className={statusFilter === 'completed' ? 'active' : ''} onClick={() => setStatusFilter("completed")}>100% Approved</button>
+                    <button className={statusFilter === 'pending' ? 'active' : ''} onClick={() => setStatusFilter("pending")}>Needs Review</button>
+                  </div>
+                  <div className="filter-section">
+                    <div className="filter-section-title">Template</div>
+                    <button className={templateFilter === 'all' ? 'active' : ''} onClick={() => setTemplateFilter("all")}>All Templates</button>
+                    {uniqueTemplates.map((tpl) => (
+                      <button
+                        key={tpl}
+                        className={templateFilter === tpl ? 'active' : ''}
+                        onClick={() => setTemplateFilter(tpl)}
+                      >
+                        {tpl}
+                      </button>
+                    ))}
+                  </div>
+                  {(statusFilter !== 'all' || templateFilter !== 'all') && (
+                    <button className="clear-filters-btn" onClick={() => {
+                      setStatusFilter("all");
+                      setTemplateFilter("all");
+                      setShowFilterDropdown(false);
+                    }}>
+                      Clear All Filters
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 4. Export Button */}
+            <button className="header-btn export-btn" onClick={() => exportAllToExcel(filteredHistory)} disabled={filteredHistory.length === 0} title="Export filtered extractions to Excel">
               <Upload size={14} />
               Export
             </button>
@@ -247,9 +514,18 @@ export function Dashboard({ setActiveNav }) {
                           </div>
                         </div>
                         <div className="hover-actions">
-                          <button className="h-btn primary" onClick={() => setReviewItem(item)}>👁 Review</button>
-                          <button className="h-btn secondary" onClick={() => exportToExcel(item)}>⬇ Export</button>
-                          <button className="h-btn danger" onClick={() => deletePdf(item.id)}>Delete</button>
+                          <button className="h-btn primary" onClick={() => setReviewItem(item)}>
+                            <Eye size={13} />
+                            <span>Review</span>
+                          </button>
+                          <button className="h-btn secondary" onClick={() => exportToExcel(item)}>
+                            <Download size={13} />
+                            <span>Export</span>
+                          </button>
+                          <button className="h-btn danger" onClick={() => deletePdf(item.id)}>
+                            <Trash2 size={13} />
+                            <span>Delete</span>
+                          </button>
                         </div>
                       </div>
                     </div>

@@ -31,8 +31,8 @@
   --text-muted:  #9CA3AF;
 
   /* typography */
-  --font-sans:   'Inter', system-ui, sans-serif;
-  --font-mono:   'Inter', system-ui, sans-serif;
+  --font-sans:   'Plus Jakarta Sans', 'Outfit', system-ui, sans-serif;
+  --font-mono:   'Plus Jakarta Sans', 'Outfit', system-ui, sans-serif;
 
   /* shape */
   --r:           8px;

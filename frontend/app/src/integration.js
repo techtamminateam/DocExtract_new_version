@@ -6,42 +6,42 @@ const BACKEND_URL = "http://localhost:5000/api";
 
 const PROVIDERS = {
   google: {
-    key:          "google",
-    label:        "Google Drive",
-    subtitle:     "File extraction & integration",
-    logo:         "/drive_logo.png",
-    logoAlt:      "Google Drive",
+    key: "google",
+    label: "Google Drive",
+    subtitle: "File extraction & integration",
+    logo: "/drive_logo.png",
+    logoAlt: "Google Drive",
     authEndpoint: `${BACKEND_URL}/auth/google`,
-    statusUrl:    `${BACKEND_URL}/auth/status`,
-    disconnectUrl:`${BACKEND_URL}/auth/disconnect`,
-    filesUrl:     `${BACKEND_URL}/drive/files`,
-    extractUrl:   `${BACKEND_URL}/extract-from-drive`,
-    scope:        "drive.readonly",
+    statusUrl: `${BACKEND_URL}/auth/status`,
+    disconnectUrl: `${BACKEND_URL}/auth/disconnect`,
+    filesUrl: `${BACKEND_URL}/drive/files`,
+    extractUrl: `${BACKEND_URL}/extract-from-drive`,
+    scope: "drive.readonly",
   },
   onedrive: {
-    key:          "onedrive",
-    label:        "Microsoft OneDrive",
-    subtitle:     "File extraction & integration",
-    logo:         "/onedrive_logo.png",
-    logoAlt:      "OneDrive",
+    key: "onedrive",
+    label: "Microsoft OneDrive",
+    subtitle: "File extraction & integration",
+    logo: "/onedrive_logo.png",
+    logoAlt: "OneDrive",
     authEndpoint: `${BACKEND_URL}/auth/microsoft`,
-    statusUrl:    `${BACKEND_URL}/onedrive/auth/status`,
-    disconnectUrl:`${BACKEND_URL}/onedrive/auth/disconnect`,
-    filesUrl:     `${BACKEND_URL}/onedrive/files`,
-    extractUrl:   `${BACKEND_URL}/onedrive/extract`,
-    scope:        "Files.Read",
+    statusUrl: `${BACKEND_URL}/onedrive/auth/status`,
+    disconnectUrl: `${BACKEND_URL}/onedrive/auth/disconnect`,
+    filesUrl: `${BACKEND_URL}/onedrive/files`,
+    extractUrl: `${BACKEND_URL}/onedrive/extract`,
+    scope: "Files.Read",
   },
 };
 
 // ─── Single-provider panel ───────────────────────────────────
 function DrivePanel({ provider }) {
-  const [files,      setFiles]      = useState([]);
-  const [connected,  setConnected]  = useState(false);
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState("");
-  const [toast,      setToast]      = useState(null);
+  const [files, setFiles] = useState([]);
+  const [connected, setConnected] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
   const [extracting, setExtracting] = useState(null);
-  const [user,       setUser]       = useState(null);
+  const [user, setUser] = useState(null);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -55,13 +55,16 @@ function DrivePanel({ provider }) {
       const res = await fetch(provider.statusUrl, { credentials: "include" });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      if (data.connected) { 
-        setConnected(true); 
+      if (data.connected) {
+        setConnected(true);
         setUser(data.user || null);
       }
       else {
         setConnected(false);
         setUser(null);
+        if (data.error === "insufficient_scopes") {
+          setError("Access to Google Drive was not fully authorized. Please connect again and check the permission checkbox.");
+        }
       }
     } catch {
       setError("Could not verify connection status.");
@@ -163,18 +166,19 @@ function DrivePanel({ provider }) {
         ) : (
           <div className="connect-state">
             {user && user.picture ? (
-              <img 
-                src={user.picture} 
-                alt="Profile" 
-                style={{ width: 80, height: 80, borderRadius: '50%', marginBottom: 16, border: '3px solid #e2e8f0' }} 
+              <img
+                src={user.picture}
+                alt="Profile"
+                referrerPolicy="no-referrer"
+                style={{ width: 80, height: 80, borderRadius: '50%', marginBottom: 16, border: '3px solid #e2e8f0', objectFit: 'cover' }}
               />
             ) : (
               <div className="connect-illustration" style={{ opacity: 0.5 }} />
             )}
             <div className="connect-text">
-              <h3>{user && user.email ? user.email : `${provider.label} Connected`}</h3>
-              {user && user.name && <p style={{ fontWeight: 600, color: '#334155', margin: '4px 0 8px' }}>{user.name}</p>}
-              <p>
+              <h3>{user && user.name ? user.name : `${provider.label} Connected`}</h3>
+              {user && user.email && <p style={{ fontWeight: 600, color: '#64748b', margin: '4px 0 8px' }}>{user.email}</p>}
+              <p style={{ marginTop: '8px' }}>
                 Your account is successfully connected. Please go to the New Extraction page to browse and select your files.
               </p>
             </div>

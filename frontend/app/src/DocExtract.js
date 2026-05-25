@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Play, User, Bell, Shield, KeyRound, CreditCard, Plus, LayoutGrid, Hash, Clock3 } from "lucide-react";
+import { Play, User, Bell, Shield, KeyRound, CreditCard, Plus, LayoutGrid, Hash, Clock3, Trash2, Activity, DollarSign, ShieldCheck, FileText, Calendar, Users, Type, Wand2, FilePlus2, CheckSquare, Mail, Building2, CalendarDays, MessageSquare, AlertCircle, ChevronDown, ChevronRight, Check, Save, Download, Eye, EyeOff, CheckCircle, AlertTriangle, Info, RefreshCw, Clock } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./DocExtract.css";
 import { History } from "./history";
@@ -676,6 +676,44 @@ function highlight(json) {
 let _idCounter = 0;
 const nextId = () => ++_idCounter;
 
+const getTemplateTheme = (name) => {
+  const lower = String(name).toLowerCase();
+  if (lower.includes('health')) return { 
+    icon: <Activity size={18} strokeWidth={2} />, 
+    bg: '#e0f2fe', color: '#3b82f6', tagBg: '#e0f2fe', tagColor: '#3b82f6' 
+  };
+  if (lower.includes('financ')) return { 
+    icon: <DollarSign size={18} strokeWidth={2} />, 
+    bg: '#dcfce7', color: '#22c55e', tagBg: '#dcfce7', tagColor: '#22c55e' 
+  };
+  if (lower.includes('msa')) return { 
+    icon: <ShieldCheck size={18} strokeWidth={2} />, 
+    bg: '#f3e8ff', color: '#a855f7', tagBg: '#f3e8ff', tagColor: '#a855f7' 
+  };
+  if (lower.includes('sow')) return { 
+    icon: <FileText size={18} strokeWidth={2} />, 
+    bg: '#fef3c7', color: '#f59e0b', tagBg: '#fef3c7', tagColor: '#f59e0b' 
+  };
+  return { 
+    icon: <LayoutGrid size={18} strokeWidth={2} />, 
+    bg: '#f1f5f9', color: '#64748b', tagBg: '#f1f5f9', tagColor: '#64748b' 
+  };
+};
+
+const getPresetIcon = (label) => {
+  const lower = label.toLowerCase();
+  if (lower.includes('policy num')) return <Type size={14} color="#8b5cf6" />;
+  if (lower.includes('name')) return <User size={14} color="#10b981" />;
+  if (lower.includes('period') || lower.includes('date')) return <CalendarDays size={14} color="#f97316" />;
+  if (lower.includes('premium') || lower.includes('amount') || lower.includes('fee')) return <DollarSign size={14} color="#3b82f6" />;
+  if (lower.includes('company') || lower.includes('hospital')) return <Building2 size={14} color="#6366f1" />;
+  if (lower.includes('address')) return <Mail size={14} color="#14b8a6" />;
+  if (lower.includes('deductible')) return <CheckSquare size={14} color="#f59e0b" />;
+  if (lower.includes('endorsement')) return <FileText size={14} color="#10b981" />;
+  if (lower.includes('form')) return <LayoutGrid size={14} color="#ec4899" />;
+  return <Hash size={14} color="#64748b" />;
+};
+
 // ── NEW EXTRACTION UI ──────────────────────────────────────────────────────────
 function NewExtractionUI({
   file,
@@ -750,61 +788,88 @@ function NewExtractionUI({
   filteredDriveFiles,
   importDriveFile,
   driveSelectingId,
+  openOneDrivePicker,
+  oneDriveModalOpen,
+  closeOneDrivePicker,
+  oneDriveSearch,
+  setOneDriveSearch,
+  oneDriveLoading,
+  oneDriveError,
+  oneDriveConnected,
+  filteredOneDriveFiles,
+  importOneDriveFile,
+  oneDriveSelectingId,
 }) {
+  const [presetOpen, setPresetOpen] = useState(false);
+  const selectRef = useRef(null);
+  const [selectedPage, setSelectedPage] = useState(1);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (selectRef.current && !selectRef.current.contains(event.target)) {
+        setPresetOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const theme = getTemplateTheme(preset || "Financial Statements");
+  
+  const presetsList = [
+    { value: "Invoice Checking", label: "Invoice Checking" },
+    { value: "Financial Statements", label: "Financial Statements" },
+    { value: "Legal Documents", label: "Legal Documents" },
+    { value: "Health Care Documents", label: "Health Care Documents" },
+    { value: "MSA Extraction", label: "MSA Extraction" },
+    { value: "SOW Extraction", label: "SOW Extraction" }
+  ];
+
   return (
     <>
       {/* ══════════════════ VERIFY SCREEN ══════════════════ */}
       {verifyMode && result && (
         <div className="dv-root">
           {/* Top bar */}
-          <div className="dv-topbar">
-            <button className="dv-back-btn" onClick={backToExtraction}>
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke="currentColor" width="15" height="15">
-                <path d="M19 12H5M12 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Back
-            </button>
-            <div className="dv-topbar-center">
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" stroke="currentColor" width="14" height="14">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-              </svg>
-              <span className="dv-filename">{file?.name}</span>
-              <div className="dv-topbar-stats">
-                <span className="dv-stat approved">{approvedCount} approved</span>
-                <span className="dv-stat flagged">{flaggedCount} flagged</span>
-                <span className="dv-stat pending">{pendingCount} pending</span>
+          <div className="dv-topbar-v2">
+            <div className="dv-topbar-left-v2">
+              <button className="dv-breadcrumb-link" onClick={backToExtraction}>
+                <ChevronDown size={14} style={{transform: 'rotate(90deg)', marginRight: '4px'}}/> Extractions
+              </button>
+              <ChevronRight size={14} className="dv-breadcrumb-sep" />
+              <div className="dv-breadcrumb-current">
+                {file?.name || "medical field.pdf"}
+              </div>
+              <div className="dv-topbar-stats-v2">
+                <span className="dv-stat-v2 approved">{approvedCount} Approved</span>
+                <span className="dv-stat-v2 flagged">{flaggedCount} Flagged</span>
+                <span className="dv-stat-v2 pending">{pendingCount} Pending</span>
               </div>
             </div>
-            <div className="dv-topbar-actions">
-              <button className="dv-approve-all-btn" onClick={approveAll}>
-                ✓ Approve All
+            
+            <div className="dv-topbar-actions-v2">
+              <button className="dv-approve-all-btn-v2" onClick={approveAll}>
+                <Check size={14} strokeWidth={2.5} /> Approve All
               </button>
-              <button className="dv-export-btn" onClick={saveJson}>
-                Save
+              <button className="dv-save-btn-v2" onClick={saveJson}>
+                <Save size={14} strokeWidth={2} /> Save
               </button>
-              <button className="dv-export-btn" onClick={exportVerified}>
-                ↓ Export Verified
+              <button className="dv-export-btn-v2" onClick={exportVerified}>
+                <Download size={14} strokeWidth={2} /> Export Verified
               </button>
             </div>
           </div>
 
           {/* Split pane */}
-          <div className="dv-split">
+          <div className="dv-split-v2">
             {/* LEFT: PDF viewer */}
-            <div className="dv-pdf-pane">
-              <div className="dv-pane-label">
-                <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" stroke="currentColor" width="13" height="13">
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-                Source Document
-              </div>
+            <div className="dv-pdf-pane-v2" style={{ padding: 0, border: 'none' }}>
               {pdfUrl ? (
                 <iframe
-                  className="dv-pdf-iframe"
+                  className="dv-pdf-iframe-v2"
                   src={pdfUrl}
                   title="PDF Viewer"
+                  style={{ width: '100%', height: '100%', border: 'none', borderRadius: '12px' }}
                 />
               ) : (
                 <div className="dv-pdf-fallback">PDF preview unavailable</div>
@@ -812,54 +877,55 @@ function NewExtractionUI({
             </div>
 
             {/* RIGHT: Fields panel */}
-            <div className="dv-fields-pane">
-              <div className="dv-pane-label">
-                <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" stroke="currentColor" width="13" height="13">
-                  <polyline points="9 11 12 14 22 4" />
-                  <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-                </svg>
-                Extracted Fields &nbsp;<span className="dv-field-count">{verifyEntries.length} fields</span>
+            <div className="dv-fields-pane-v2">
+              <div className="dv-pane-header-v2">
+                <div className="dv-pane-label-v2">
+                  <CheckSquare size={16} color="#64748b" /> EXTRACTED FIELDS
+                </div>
+                <span className="dv-field-count-pill">{verifyEntries.length} FIELDS</span>
               </div>
-              <div className="dv-fields-list">
+              <div className="dv-fields-list-v2">
                 {verifyEntries.map(([key, val], idx) => {
                   const status = verifiedFields[key] || "pending";
                   const isFlagged = status === "flagged";
                   return (
-                    <div key={key} className={`dv-field-card dv-status-${status}`}>
-                      <div className="dv-field-card-top">
-                        <div className="dv-field-left">
-                          <span className="dv-field-idx">{String(idx + 1).padStart(2, "0")}</span>
-                          <span className="dv-field-key">{key}</span>
+                    <div key={key} className={`dv-field-card-v2 status-${status}`}>
+                      <div className="dv-field-card-top-v2">
+                        <div className="dv-field-left-v2">
+                          <span className="dv-field-idx-v2">{String(idx + 1).padStart(2, "0")}</span>
+                          <span className="dv-field-key-v2">{key}</span>
                         </div>
-                        <div className="dv-field-actions">
-                          <span className={`dv-status-badge dv-badge-${status}`}>
-                            {status === "approved" ? "✓ Approved" : status === "flagged" ? "⚑ Flagged" : "● Pending"}
+                        <div className="dv-field-actions-v2">
+                          <span className={`dv-status-badge-v2 badge-${status}`}>
+                            {status === "approved" ? "Approved" : status === "flagged" ? "Flagged" : "Pending"}
                           </span>
                           <button
-                            className={`dv-btn-approve${status === "approved" ? " active" : ""}`}
+                            className={`dv-btn-approve-v2 ${status === "approved" ? "active" : ""}`}
                             onClick={() => setFieldStatus(key, status === "approved" ? "pending" : "approved")}
                             title="Approve"
                           >
-                            ✓
+                            <Check size={12} strokeWidth={3} />
                           </button>
                           <button
-                            className={`dv-btn-flag${status === "flagged" ? " active" : ""}`}
+                            className={`dv-btn-flag-v2 ${status === "flagged" ? "active" : ""}`}
                             onClick={() => setFieldStatus(key, status === "flagged" ? "pending" : "flagged")}
                             title="Flag for review"
                           >
-                            ⚑
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="10" height="10">
+                              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1v19h2v-7z" />
+                            </svg>
                           </button>
                         </div>
                       </div>
                       <textarea
-                        className="dv-field-value"
+                        className="dv-field-value-v2"
                         value={editedResult[key] ?? ""}
                         onChange={(e) => setFieldValue(key, e.target.value)}
                         rows={Math.min(6, Math.max(2, (editedResult[key] || "").split("\n").length + 1))}
                         placeholder="null"
                       />
                       {isFlagged && (
-                        <div className="dv-flag-note-wrap">
+                        <div className="dv-flag-note-wrap-v2">
                           <input
                             className="dv-flag-note-input"
                             placeholder="Add a note about this issue…"
@@ -871,6 +937,9 @@ function NewExtractionUI({
                     </div>
                   );
                 })}
+                <button className="dv-add-field-bottom-btn" onClick={backToExtraction}>
+                  <Plus size={14} strokeWidth={2.5} /> Add Field
+                </button>
               </div>
             </div>
           </div>
@@ -895,9 +964,15 @@ function NewExtractionUI({
               >
                 <span>Google Drive</span>
               </button>
+              <button
+                className={`de-source-tab${uploadSource === "onedrive" ? " active" : ""}`}
+                onClick={() => switchUploadSource("onedrive")}
+              >
+                <span>Microsoft OneDrive</span>
+              </button>
             </div>
 
-            {uploadSource === "local" ? (
+            {uploadSource === "local" && (
               <div
                 className={`de-drop-zone${dragging ? " dragover" : ""}`}
                 onDragOver={onDragOver}
@@ -905,7 +980,14 @@ function NewExtractionUI({
                 onDrop={onDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <input type="file" accept=".pdf" ref={fileInputRef} onChange={onFileChange} />
+                <input 
+                  type="file" 
+                  accept=".pdf" 
+                  ref={fileInputRef} 
+                  onChange={onFileChange} 
+                  style={{ display: 'none' }} 
+                  onClick={(e) => e.stopPropagation()} 
+                />
                 <div className="de-up-icon">
                   <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5">
                     <path
@@ -928,10 +1010,12 @@ function NewExtractionUI({
                   <span style={{ color: "var(--text-dim)" }}>
                     {file ? `(${(file.size / 1024 / 1024).toFixed(2)} MB)` : ""}
                   </span>
-                  <span className="rm" onClick={clearFile}>✕</span>
+                  <span className="rm" onClick={(e) => { e.stopPropagation(); clearFile(); }}>✕</span>
                 </div>
               </div>
-            ) : (
+            )}
+
+            {uploadSource === "drive" && (
               <div className="de-drive-launch" onClick={openDrivePicker}>
                 <div className="de-up-icon">
                   <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5">
@@ -942,7 +1026,7 @@ function NewExtractionUI({
                 <div className="de-up-sub">
                   Click to browse your Drive files
                 </div>
-                <button className="de-drive-btn" type="button" onClick={openDrivePicker}>
+                <button className="de-drive-btn" type="button" onClick={(e) => { e.stopPropagation(); openDrivePicker(); }}>
                   Browse Drive files
                 </button>
                 <div className={`de-file-info${file ? " show" : ""}`}>
@@ -954,7 +1038,35 @@ function NewExtractionUI({
                   <span style={{ color: "var(--text-dim)" }}>
                     {file ? `(${(file.size / 1024 / 1024).toFixed(2)} MB)` : ""}
                   </span>
-                  <span className="rm" onClick={clearFile}>✕</span>
+                  <span className="rm" onClick={(e) => { e.stopPropagation(); clearFile(); }}>✕</span>
+                </div>
+              </div>
+            )}
+
+            {uploadSource === "onedrive" && (
+              <div className="de-drive-launch" onClick={openOneDrivePicker}>
+                <div className="de-up-icon">
+                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5">
+                    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" stroke="currentColor" />
+                  </svg>
+                </div>
+                <div className="de-up-title">Select a PDF from Microsoft OneDrive</div>
+                <div className="de-up-sub">
+                  Click to browse your OneDrive files
+                </div>
+                <button className="de-drive-btn" type="button" onClick={(e) => { e.stopPropagation(); openOneDrivePicker(); }}>
+                  Browse OneDrive files
+                </button>
+                <div className={`de-file-info${file ? " show" : ""}`}>
+                  <svg className="de-file-info-font" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  <span className="de-file-info-font">{file?.name}</span>
+                  <span style={{ color: "var(--text-dim)" }}>
+                    {file ? `(${(file.size / 1024 / 1024).toFixed(2)} MB)` : ""}
+                  </span>
+                  <span className="rm" onClick={(e) => { e.stopPropagation(); clearFile(); }}>✕</span>
                 </div>
               </div>
             )}
@@ -968,27 +1080,50 @@ function NewExtractionUI({
                     <div className="de-step-sub">Each field has its own extraction instruction</div>
                   </div>
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <select
-                      className="de-dp-add-btn"
-                      onChange={handlePresetChange}
-                      value={preset} // Keep it controlled so it always snaps back to the placeholder
-                    >
-                      <option value="Invoice Checking">Invoice Checking</option>
-                      <option value="Financial Statements">Financial Statements</option>
-                      <option value="Legal Documents">Legal Documents</option>
-                      <option value="Health Care Documents">Health Care Documents</option>
-                      <option value="MSA Extraction">MSA Extraction</option>
-                      <option value="SOW Extraction">SOW Extraction</option>
-                    </select>
-                    <button className="de-dp-add-btn" onClick={() => addDataPoint()}>
-                      + Add Field
+                    <div className="de-custom-select-container" ref={selectRef}>
+                      <button 
+                        className="de-custom-select-btn" 
+                        onClick={() => setPresetOpen(!presetOpen)}
+                      >
+                        <span className="de-custom-select-icon" style={{ backgroundColor: theme.bg, color: theme.color }}>
+                          {theme.icon}
+                        </span>
+                        <span>{preset || "Select template"}</span>
+                        <ChevronDown size={14} className="de-custom-select-chevron" />
+                      </button>
+                      
+                      {presetOpen && (
+                        <div className="de-custom-select-dropdown">
+                          {presetsList.map(p => {
+                            const pTheme = getTemplateTheme(p.value);
+                            return (
+                              <button 
+                                key={p.value}
+                                className={`de-custom-select-option ${preset === p.value ? "selected" : ""}`}
+                                onClick={() => {
+                                  handlePresetChange({ target: { value: p.value } });
+                                  setPresetOpen(false);
+                                }}
+                              >
+                                <span className="de-custom-select-icon" style={{ backgroundColor: pTheme.bg, color: pTheme.color }}>
+                                  {pTheme.icon}
+                                </span>
+                                <span>{p.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <button className="de-add-field-btn-v2" onClick={() => addDataPoint()}>
+                      <Plus size={14} strokeWidth={2.5} /> Add Field
                     </button>
                     <button
-                      className={`de-extract-btn${loading ? " loading" : ""}`}
+                      className={`de-extract-btn-v2${loading ? " loading" : ""}`}
                       onClick={runExtraction}
                       disabled={!canRun || loading}
                     >
-                      <span className="de-btn-txt"><Play size={16} className="de-btn-icon" /> Run Extraction</span>
+                      <span className="de-btn-txt"><Play size={14} className="de-btn-icon" fill="currentColor" /> Run Extraction</span>
                       <span className="de-btn-spin" />
                     </button>
                   </div>
@@ -998,33 +1133,52 @@ function NewExtractionUI({
               <div className="de-card-surface">
                 {/* Add row */}
                 <div className="de-dp-add-labels">
-                  <span>FIELD NAME</span>
-                  <span>EXTRACTION PROMPT / INSTRUCTION</span>
+                  <span>FIELD NAME <span style={{color: '#ef4444'}}>*</span></span>
+                  <span>EXTRACTION PROMPT / INSTRUCTION <span style={{color: '#ef4444'}}>*</span></span>
                 </div>
                 <div className="de-dp-add-row">
-                  <input
-                    type="text"
-                    className="de-dp-field-input"
-                    placeholder="e.g. Policy Number"
-                    autoComplete="off"
-                    value={newField}
-                    onChange={(e) => setNewField(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDataPoint(); } }}
-                  />
-                  <textarea
-                    className="de-dp-prompt-input"
-                    rows={1}
-                    placeholder='e.g. Extract only the policy number. Return in format "POL-XXXXXXXX". If not found return null.'
-                    value={newPrompt}
-                    onChange={(e) => setNewPrompt(e.target.value)}
-                  />
+                  <div className="de-input-wrapper">
+                    <span className="de-input-icon" style={{ backgroundColor: '#f3e8ff', color: '#a855f7' }}>
+                      <Type size={14} strokeWidth={2.5} />
+                    </span>
+                    <input
+                      type="text"
+                      className="de-dp-field-input with-icon"
+                      placeholder="e.g. Policy Number"
+                      autoComplete="off"
+                      value={newField}
+                      onChange={(e) => setNewField(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDataPoint(); } }}
+                    />
+                  </div>
+                  
+                  <div className="de-input-wrapper flex-1">
+                    <span className="de-input-icon" style={{ backgroundColor: '#f3e8ff', color: '#a855f7' }}>
+                      <Wand2 size={14} strokeWidth={2.5} />
+                    </span>
+                    <textarea
+                      className="de-dp-prompt-input with-icon"
+                      rows={1}
+                      placeholder='e.g. Extract only the policy number. Return in format "POL-XXXXXXXX". If not found return null.'
+                      value={newPrompt}
+                      onChange={(e) => setNewPrompt(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 {/* Data point list */}
                 <div className="de-dp-list">
                   {dataPoints.length === 0 && (
-                    <div className="de-dp-empty">
-                      No data points added yet — add a field name and its extraction instruction above.
+                    <div className="de-dp-empty-state">
+                      <div className="de-empty-icon-wrapper">
+                        <div className="de-empty-circle">
+                          <FilePlus2 size={24} color="#6366f1" />
+                        </div>
+                      </div>
+                      <div className="de-empty-text-wrap">
+                        <h3>No data points added yet</h3>
+                        <p>Add a field name and its extraction instruction above.</p>
+                      </div>
                     </div>
                   )}
 
@@ -1054,8 +1208,9 @@ function NewExtractionUI({
                             <span className="de-arrow">▾</span>
                           </button>
                           <button
+                            type="button"
                             className="de-dp-delete-btn"
-                            onClick={() => removeDataPoint(dp.id)}
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); removeDataPoint(dp.id); }}
                             title="Remove"
                           >
                             ✕
@@ -1087,31 +1242,52 @@ function NewExtractionUI({
 
                 {/* Presets */}
                 <div className="de-presets-row">
-                  <span className="de-presets-label">Quick add:</span>
-                  {selectedPreset.map((p) => (
-                    <button
-                      key={p.field}
-                      className="de-preset-chip"
-                      onClick={() => addPreset(p.field, p.prompt)}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
+                  <span className="de-presets-label">QUICK ADD:</span>
+                  {selectedPreset.map((p) => {
+                    const presetIcon = getPresetIcon(p.label);
+                    return (
+                      <button
+                        key={p.field}
+                        className="de-preset-chip-v2"
+                        onClick={() => addPreset(p.field, p.prompt)}
+                      >
+                        <span className="preset-chip-icon">{presetIcon}</span>
+                        {p.label}
+                      </button>
+                    )
+                  })}
                 </div>
 
                 {/* Summary bar */}
-                <div className="de-summary-bar">
-                  <div className="de-sb-stat">
-                    Total Fields: <span className="sv">{dataPoints.length}</span>
+                <div className="de-summary-bar-v2">
+                  <div className="de-sb-stat-v2">
+                    <div className="de-sb-icon-wrap" style={{ backgroundColor: '#f3e8ff', color: '#8b5cf6' }}>
+                      <LayoutGrid size={16} />
+                    </div>
+                    <div className="de-sb-text-col">
+                      <span className="de-sb-label">Total Fields</span>
+                      <span className="de-sb-value text-blue">{dataPoints.length}</span>
+                    </div>
                   </div>
-                  <div className="de-sb-sep" />
-                  <div className="de-sb-stat">
-                    With Prompts: <span className="sv ok">{withPrompts}</span>
+                  <div className="de-sb-sep-v2" />
+                  <div className="de-sb-stat-v2">
+                    <div className="de-sb-icon-wrap" style={{ backgroundColor: '#dcfce7', color: '#10b981' }}>
+                      <MessageSquare size={16} />
+                    </div>
+                    <div className="de-sb-text-col">
+                      <span className="de-sb-label">With Prompts</span>
+                      <span className="de-sb-value text-green">{withPrompts}</span>
+                    </div>
                   </div>
-                  <div className="de-sb-sep" />
-                  <div className="de-sb-stat">
-                    Missing Prompts:{" "}
-                    <span className={`sv ${missingCount > 0 ? "warn" : "ok"}`}>{missingCount}</span>
+                  <div className="de-sb-sep-v2" />
+                  <div className="de-sb-stat-v2">
+                    <div className="de-sb-icon-wrap" style={{ backgroundColor: '#fee2e2', color: '#ef4444' }}>
+                      <AlertCircle size={16} />
+                    </div>
+                    <div className="de-sb-text-col">
+                      <span className="de-sb-label">Missing Prompts</span>
+                      <span className="de-sb-value text-red">{missingCount}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1261,18 +1437,20 @@ function NewExtractionUI({
                     </div>
                   ) : driveError ? (
                     <div className="de-drive-state de-drive-state-error">
-                      <div>{driveError}</div>
-                      {!driveConnected && (
-                        <button
-                          className="de-drive-modal-action"
-                          onClick={() => {
-                            closeDrivePicker();
-                            setActiveNav("integrations");
-                          }}
-                        >
-                          Open Integrations
-                        </button>
-                      )}
+                      <div>
+                        {driveError.includes("insufficient") || driveError.includes("scope")
+                          ? "Access to Google Drive was not fully authorized. Please go to Integrations, disconnect Google Drive, and reconnect it, ensuring you check the checkbox to view and download your files."
+                          : driveError}
+                      </div>
+                      <button
+                        className="de-drive-modal-action"
+                        onClick={() => {
+                          closeDrivePicker();
+                          setActiveNav("integrations");
+                        }}
+                      >
+                        Go to Integrations
+                      </button>
                     </div>
                   ) : filteredDriveFiles.length === 0 ? (
                     <div className="de-drive-state">No PDF files found.</div>
@@ -1299,22 +1477,271 @@ function NewExtractionUI({
               </div>
             </div>
           )}
+
+          {oneDriveModalOpen && (
+            <div className="de-drive-modal-backdrop" onClick={closeOneDrivePicker}>
+              <div className="de-drive-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="de-drive-modal-head">
+                  <div>
+                    <div className="de-drive-modal-title">Select from Microsoft OneDrive</div>
+                    <div className="de-drive-modal-sub">Choose a PDF document to extract</div>
+                  </div>
+                  <button className="de-drive-modal-close" onClick={closeOneDrivePicker} aria-label="Close">
+                    ×
+                  </button>
+                </div>
+
+                <div className="de-drive-modal-search">
+                  <input
+                    type="text"
+                    value={oneDriveSearch}
+                    onChange={(e) => setOneDriveSearch(e.target.value)}
+                    placeholder="Search files..."
+                  />
+                </div>
+
+                <div className="de-drive-modal-body">
+                  {oneDriveLoading ? (
+                    <div className="de-drive-state">
+                      <div className="spinner" />
+                      Loading OneDrive files…
+                    </div>
+                  ) : oneDriveError ? (
+                    <div className="de-drive-state de-drive-state-error">
+                      <div>
+                        {oneDriveError.includes("insufficient") || oneDriveError.includes("scope")
+                          ? "Access to Microsoft OneDrive was not fully authorized. Please go to Integrations, disconnect OneDrive, and reconnect it, ensuring you grant access to view and download your files."
+                          : oneDriveError}
+                      </div>
+                      <button
+                        className="de-drive-modal-action"
+                        onClick={() => {
+                          closeOneDrivePicker();
+                          setActiveNav("integrations");
+                        }}
+                      >
+                        Go to Integrations
+                      </button>
+                    </div>
+                  ) : filteredOneDriveFiles.length === 0 ? (
+                    <div className="de-drive-state">No PDF files found.</div>
+                  ) : (
+                    filteredOneDriveFiles.map((item) => (
+                      <button
+                        key={item.id}
+                        className="de-drive-file-row"
+                        onClick={() => importOneDriveFile(item)}
+                        disabled={oneDriveSelectingId !== null}
+                      >
+                        <div className="de-drive-file-icon">PDF</div>
+                        <div className="de-drive-file-meta">
+                          <span className="de-drive-file-name">{item.name}</span>
+                          <span className="de-drive-file-id">{item.id}</span>
+                        </div>
+                        <span className="de-drive-file-action">
+                          {oneDriveSelectingId === item.id ? "Loading…" : "Select"}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
   );
 }
 
-function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("Billings");
+function SettingsPage({ activeTab, setActiveTab, notifications, setNotifications }) {
+  const [userEmail, setUserEmail] = useState("alex.johnson@company.com");
+  const [newEmailInput, setNewEmailInput] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpDigits, setOtpDigits] = useState(["", "", "", "", "", ""]);
+  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [emailSuccess, setEmailSuccess] = useState("");
+
+  // Password change states
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Notification states
+  const [notifSuccess, setNotifSuccess] = useState(true);
+  const [notifFailure, setNotifFailure] = useState(true);
+  const [notifReview, setNotifReview] = useState(true);
+  const [notifDigest, setNotifDigest] = useState(false);
+  const [notifUsage, setNotifUsage] = useState(true);
+  const [notifEmail, setNotifEmail] = useState(true);
+  const [notifInApp, setNotifInApp] = useState(true);
+  const [notifSlack, setNotifSlack] = useState(false);
+  const [notifSuccessBanner, setNotifSuccessBanner] = useState("");
+
+  const handleSaveNotifications = (e) => {
+    e.preventDefault();
+    setNotifSuccessBanner("Notification preferences updated successfully.");
+    setTimeout(() => {
+      setNotifSuccessBanner("");
+    }, 4000);
+  };
+
+  const getPasswordStrength = (pwd) => {
+    if (!pwd) return { score: 0, label: "Empty", color: "#e2e8f0" };
+    let score = 0;
+    if (pwd.length >= 8) score += 1;
+    if (/[A-Z]/.test(pwd)) score += 1;
+    if (/[0-9]/.test(pwd)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pwd)) score += 1;
+    
+    if (score <= 1) return { score: 25, label: "Weak", color: "#ef4444" };
+    if (score === 2) return { score: 50, label: "Fair", color: "#f59e0b" };
+    if (score === 3) return { score: 75, label: "Good", color: "#3b82f6" };
+    return { score: 100, label: "Strong", color: "#10b981" };
+  };
+
+  const handleUpdatePassword = (e) => {
+    e.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (!currentPassword) {
+      setPasswordError("Please enter your current password.");
+      return;
+    }
+    if (!newPassword) {
+      setPasswordError("Please enter a new password.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters long.");
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setPasswordError("New password cannot be the same as your current password.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords do not match. Please verify the confirmation password.");
+      return;
+    }
+
+    // Successfully updated (mock)
+    setPasswordSuccess("Your password has been updated successfully.");
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  };
+
+  const otpInputRefs = [
+    useRef(null),
+    useRef(null),
+    useRef(null),
+    useRef(null),
+    useRef(null),
+    useRef(null)
+  ];
+
+  const handleOtpChange = (index, value) => {
+    if (value && !/^\d$/.test(value)) return;
+    const newDigits = [...otpDigits];
+    newDigits[index] = value;
+    setOtpDigits(newDigits);
+    if (value && index < 5) {
+      otpInputRefs[index + 1].current.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
+      otpInputRefs[index - 1].current.focus();
+    }
+  };
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text").trim();
+    if (/^\d{6}$/.test(pastedData)) {
+      const newDigits = pastedData.split("");
+      setOtpDigits(newDigits);
+      if (otpInputRefs[5].current) {
+        otpInputRefs[5].current.focus();
+      }
+    }
+  };
+
+  const handleSendOtp = () => {
+    setEmailError("");
+    setEmailSuccess("");
+    
+    if (!newEmailInput) {
+      setEmailError("Please enter a new email address.");
+      return;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmailInput)) {
+      setEmailError("Please enter a valid email address.");
+      return;
+    }
+    
+    if (newEmailInput.toLowerCase() === userEmail.toLowerCase()) {
+      setEmailError("New email must be different from current email.");
+      return;
+    }
+    
+    // Generate code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(code);
+    setOtpSent(true);
+    setOtpDigits(["", "", "", "", "", ""]);
+    setEmailSuccess(`A 6-digit verification code has been sent to ${newEmailInput}.`);
+  };
+
+  const handleVerifyOtp = () => {
+    setEmailError("");
+    setEmailSuccess("");
+    const enteredOtp = otpDigits.join("");
+    
+    if (enteredOtp.length < 6) {
+      setEmailError("Please enter all 6 digits of the verification code.");
+      return;
+    }
+    
+    if (enteredOtp === generatedOtp) {
+      setUserEmail(newEmailInput.toLowerCase());
+      setNewEmailInput("");
+      setOtpSent(false);
+      setGeneratedOtp("");
+      setOtpDigits(["", "", "", "", "", ""]);
+      setEmailSuccess("Your account email address has been successfully updated.");
+    } else {
+      setEmailError("Invalid verification code. Please check and try again.");
+    }
+  };
+
+  const handleCancelEmailChange = () => {
+    setOtpSent(false);
+    setGeneratedOtp("");
+    setOtpDigits(["", "", "", "", "", ""]);
+    setNewEmailInput("");
+    setEmailError("");
+    setEmailSuccess("");
+  };
   const [contactMode, setContactMode] = useState("existing");
   const [additionalEmail, setAdditionalEmail] = useState("");
   const [showExtraCard, setShowExtraCard] = useState(false);
   const [primaryCard, setPrimaryCard] = useState({
     name: "Alex Johnson",
-    expiry: "02 / 2028",
-    number: "8269 9620 9292 2538",
-    cvv: "1234",
+    expiry: "02/2028",
+    number: "8269962092922538",
+    cvv: "123",
   });
   const [extraCard, setExtraCard] = useState({
     name: "",
@@ -1322,6 +1749,42 @@ function SettingsPage() {
     number: "",
     cvv: "",
   });
+
+  const [primaryCardFocused, setPrimaryCardFocused] = useState(false);
+  const [extraCardFocused, setExtraCardFocused] = useState(false);
+  const [primaryCvvFocused, setPrimaryCvvFocused] = useState(false);
+  const [extraCvvFocused, setExtraCvvFocused] = useState(false);
+
+  const [showPrimaryNumber, setShowPrimaryNumber] = useState(false);
+  const [showPrimaryCvv, setShowPrimaryCvv] = useState(false);
+  const [showExtraNumber, setShowExtraNumber] = useState(false);
+  const [showExtraCvv, setShowExtraCvv] = useState(false);
+
+  const formatExpiry = (val) => {
+    const clean = val.replace(/\D/g, "");
+    if (clean.length <= 2) return clean;
+    return `${clean.slice(0, 2)}/${clean.slice(2, 6)}`;
+  };
+
+  const getCardValue = (val, isFocused, isVisible) => {
+    const clean = val.replace(/\D/g, "").slice(0, 16);
+    if (isFocused || isVisible) {
+      return clean.replace(/(\d{4})/g, '$1 ').trim();
+    } else {
+      if (clean.length < 4) return clean;
+      const last4 = clean.slice(-4);
+      return `•••• •••• •••• ${last4}`;
+    }
+  };
+
+  const getCvvValue = (val, isFocused, isVisible) => {
+    const clean = val.replace(/\D/g, "").slice(0, 3);
+    if (isFocused || isVisible) {
+      return clean;
+    } else {
+      return "•".repeat(clean.length);
+    }
+  };
 
   const billingRows = [
     { invoice: "DocExtract Pro", date: "Apr 14, 2026", amount: "$299", status: "Paid", tracking: "INV-2026-0414" },
@@ -1360,7 +1823,7 @@ function SettingsPage() {
         </div>
 
         <div className="settings-tabs">
-          {["My details", "Profile", "Password", "Billings", "Plan", "Email", "Notifications"].map((tab) => (
+          {["Password", "Billings", "Subscription", "Email", "Notifications", "Notification Preferences"].map((tab) => (
             <button
               key={tab}
               className={`settings-tab${tab === activeTab ? " active" : ""}`}
@@ -1402,22 +1865,49 @@ function SettingsPage() {
                     Expiry
                     <input
                       value={primaryCard.expiry}
-                      onChange={(e) => updatePrimaryCard("expiry", e.target.value)}
+                      placeholder="MM/YYYY"
+                      onChange={(e) => updatePrimaryCard("expiry", formatExpiry(e.target.value))}
                     />
                   </label>
                   <label>
                     Card Number
-                    <input
-                      value={primaryCard.number}
-                      onChange={(e) => updatePrimaryCard("number", e.target.value)}
-                    />
+                    <div className="settings-input-wrapper">
+                      <input
+                        value={getCardValue(primaryCard.number, primaryCardFocused, showPrimaryNumber)}
+                        placeholder="•••• •••• •••• ••••"
+                        onChange={(e) => updatePrimaryCard("number", e.target.value.replace(/\D/g, "").slice(0, 16))}
+                        onFocus={() => setPrimaryCardFocused(true)}
+                        onBlur={() => setPrimaryCardFocused(false)}
+                      />
+                      <button
+                        type="button"
+                        className="settings-input-toggle-btn"
+                        onClick={() => setShowPrimaryNumber(!showPrimaryNumber)}
+                        title={showPrimaryNumber ? "Hide card number" : "Show card number"}
+                      >
+                        {showPrimaryNumber ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </label>
                   <label>
                     CVV
-                    <input
-                      value={primaryCard.cvv}
-                      onChange={(e) => updatePrimaryCard("cvv", e.target.value)}
-                    />
+                    <div className="settings-input-wrapper">
+                      <input
+                        value={getCvvValue(primaryCard.cvv, primaryCvvFocused, showPrimaryCvv)}
+                        placeholder="•••"
+                        onChange={(e) => updatePrimaryCard("cvv", e.target.value.replace(/\D/g, "").slice(0, 3))}
+                        onFocus={() => setPrimaryCvvFocused(true)}
+                        onBlur={() => setPrimaryCvvFocused(false)}
+                      />
+                      <button
+                        type="button"
+                        className="settings-input-toggle-btn"
+                        onClick={() => setShowPrimaryCvv(!showPrimaryCvv)}
+                        title={showPrimaryCvv ? "Hide CVV" : "Show CVV"}
+                      >
+                        {showPrimaryCvv ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </label>
                 </div>
               </div>
@@ -1440,26 +1930,50 @@ function SettingsPage() {
                     <label>
                       Expiry
                       <input
-                        placeholder="MM / YYYY"
+                        placeholder="MM/YYYY"
                         value={extraCard.expiry}
-                        onChange={(e) => updateExtraCard("expiry", e.target.value)}
+                        onChange={(e) => updateExtraCard("expiry", formatExpiry(e.target.value))}
                       />
                     </label>
                     <label>
                       Card Number
-                      <input
-                        placeholder="0000 0000 0000 0000"
-                        value={extraCard.number}
-                        onChange={(e) => updateExtraCard("number", e.target.value)}
-                      />
+                      <div className="settings-input-wrapper">
+                        <input
+                          placeholder="•••• •••• •••• ••••"
+                          value={getCardValue(extraCard.number, extraCardFocused, showExtraNumber)}
+                          onChange={(e) => updateExtraCard("number", e.target.value.replace(/\D/g, "").slice(0, 16))}
+                          onFocus={() => setExtraCardFocused(true)}
+                          onBlur={() => setExtraCardFocused(false)}
+                        />
+                        <button
+                          type="button"
+                          className="settings-input-toggle-btn"
+                          onClick={() => setShowExtraNumber(!showExtraNumber)}
+                          title={showExtraNumber ? "Hide card number" : "Show card number"}
+                        >
+                          {showExtraNumber ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </label>
                     <label>
                       CVV
-                      <input
-                        placeholder="***"
-                        value={extraCard.cvv}
-                        onChange={(e) => updateExtraCard("cvv", e.target.value)}
-                      />
+                      <div className="settings-input-wrapper">
+                        <input
+                          placeholder="•••"
+                          value={getCvvValue(extraCard.cvv, extraCvvFocused, showExtraCvv)}
+                          onChange={(e) => updateExtraCard("cvv", e.target.value.replace(/\D/g, "").slice(0, 3))}
+                          onFocus={() => setExtraCvvFocused(true)}
+                          onBlur={() => setExtraCvvFocused(false)}
+                        />
+                        <button
+                          type="button"
+                          className="settings-input-toggle-btn"
+                          onClick={() => setShowExtraCvv(!showExtraCvv)}
+                          title={showExtraCvv ? "Hide CVV" : "Show CVV"}
+                        >
+                          {showExtraCvv ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </label>
                   </div>
                 </div>
@@ -1535,45 +2049,555 @@ function SettingsPage() {
                 </div>
               </div>
             </div>
-          ) : activeTab === "Profile" ? (
-            <div className="settings-profile-card">
-              <div className="settings-card-title">
-                <User size={16} />
-                <span>Profile</span>
-              </div>
-
-              <div className="settings-profile-grid">
-                <div className="settings-field">
-                  <span>Full Name</span>
-                  <strong>Alex Johnson</strong>
-                </div>
-                <button className="settings-link-btn">Edit</button>
-
-                <div className="settings-field">
-                  <span>Email</span>
-                  <strong>alex.johnson@company.com</strong>
-                </div>
-                <button className="settings-link-btn">Edit</button>
-
-                <div className="settings-field">
-                  <span>Organization</span>
-                  <strong>Acme Corp</strong>
-                </div>
-                <button className="settings-link-btn">Edit</button>
-              </div>
-
-              <button className="settings-primary-btn">Update Profile</button>
-            </div>
           ) : activeTab === "Notifications" ? (
-            renderSimpleCard(Bell, "Notifications", "Manage extraction alerts and email preferences.", "Update Notification Preferences")
+            <div className="notifications-tab-container">
+              {/* Recent Notifications Section */}
+              <div className="notification-list-card">
+                <div className="notification-settings-head">
+                  <h2>
+                    <Bell size={16} />
+                    <span>Recent Notifications</span>
+                  </h2>
+                  <p>View and manage your recent account and document notifications.</p>
+                </div>
+
+                <div className="notifications-list-wrapper">
+                  {notifications.length === 0 ? (
+                    <div className="no-notifications-state">
+                      <Bell size={24} style={{ color: '#cbd5e1', marginBottom: '8px' }} />
+                      <p>You have no recent notifications.</p>
+                    </div>
+                  ) : (
+                    <div className="notifications-items-list">
+                      {notifications.map((notif) => {
+                        const notifIcons = {
+                          success: <CheckCircle size={15} className="notif-icon-svg success" />,
+                          warning: <AlertTriangle size={15} className="notif-icon-svg warning" />,
+                          info: <Info size={15} className="notif-icon-svg info" />
+                        };
+                        return (
+                          <div key={notif.id} className={`notification-item-row ${notif.unread ? 'unread' : ''}`}>
+                            <div className={`notif-icon-badge ${notif.type}`}>
+                              {notifIcons[notif.type] || <Bell size={15} className="notif-icon-svg" />}
+                            </div>
+                            <div className="notif-content">
+                              <div className="notif-header">
+                                <span className="notif-title">{notif.title}</span>
+                                <div className="notif-meta">
+                                  <Clock size={11} className="notif-meta-clock" />
+                                  <span className="notif-time">{notif.time}</span>
+                                </div>
+                              </div>
+                              <p className="notif-desc">{notif.description}</p>
+                            </div>
+                            {notif.unread && (
+                              <button
+                                type="button"
+                                className="mark-read-btn"
+                                onClick={() => {
+                                  setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, unread: false } : n));
+                                }}
+                                title="Mark as read"
+                                aria-label="Mark as read"
+                              >
+                                <Check size={14} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {notifications.some(n => n.unread) && (
+                    <button
+                      type="button"
+                      className="mark-all-read-btn"
+                      onClick={() => setNotifications(prev => prev.map(n => ({ ...n, unread: false })))}
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : activeTab === "Notification Preferences" ? (
+            <div className="notifications-tab-container">
+              {/* Notification Preferences Section */}
+              <div className="notification-settings-card">
+                <div className="notification-settings-head">
+                  <h2>
+                    <Bell size={16} />
+                    <span>Notification Preferences</span>
+                  </h2>
+                  <p>Choose how and when you want to receive alerts and notifications.</p>
+                </div>
+
+                {notifSuccessBanner && (
+                  <div className="email-status-banner success" style={{ marginBottom: '20px' }}>
+                    <Check size={14} />
+                    <span>{notifSuccessBanner}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveNotifications}>
+                  <div className="notification-group">
+                    <h3>Activity Alerts</h3>
+                    <div className="notification-options">
+                      <label className="notification-option-row">
+                        <input
+                          type="checkbox"
+                          checked={notifSuccess}
+                          onChange={() => setNotifSuccess(!notifSuccess)}
+                        />
+                        <div className="option-text">
+                          <span className="option-title">Extraction Success</span>
+                          <span className="option-desc">Receive an alert when a document is processed and parsed successfully.</span>
+                        </div>
+                      </label>
+
+                      <label className="notification-option-row">
+                        <input
+                          type="checkbox"
+                          checked={notifFailure}
+                          onChange={() => setNotifFailure(!notifFailure)}
+                        />
+                        <div className="option-text">
+                          <span className="option-title">Extraction Failure</span>
+                          <span className="option-desc">Receive an alert if a document fails to parse or encounters an error.</span>
+                        </div>
+                      </label>
+
+                      <label className="notification-option-row">
+                        <input
+                          type="checkbox"
+                          checked={notifReview}
+                          onChange={() => setNotifReview(!notifReview)}
+                        />
+                        <div className="option-text">
+                          <span className="option-title">Flagged for Review</span>
+                          <span className="option-desc">Receive an alert when an extraction contains fields flagged for manual verification.</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="notification-group">
+                    <h3>Usage & Reports</h3>
+                    <div className="notification-options">
+                      <label className="notification-option-row">
+                        <input
+                          type="checkbox"
+                          checked={notifDigest}
+                          onChange={() => setNotifDigest(!notifDigest)}
+                        />
+                        <div className="option-text">
+                          <span className="option-title">Weekly Summary Digest</span>
+                          <span className="option-desc">Get a weekly email report of your extraction statistics, templates used, and savings.</span>
+                        </div>
+                      </label>
+
+                      <label className="notification-option-row">
+                        <input
+                          type="checkbox"
+                          checked={notifUsage}
+                          onChange={() => setNotifUsage(!notifUsage)}
+                        />
+                        <div className="option-text">
+                          <span className="option-title">Usage Limit Warning</span>
+                          <span className="option-desc">Notify when your monthly extraction count reaches 80% and 100% of your plan limit.</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="notification-group">
+                    <h3>Notification Channels</h3>
+                    <div className="notification-options">
+                      <label className="notification-option-row">
+                        <input
+                          type="checkbox"
+                          checked={notifEmail}
+                          onChange={() => setNotifEmail(!notifEmail)}
+                        />
+                        <div className="option-text">
+                          <span className="option-title">Email Notifications</span>
+                          <span className="option-desc">Send alert notifications directly to your primary email address.</span>
+                        </div>
+                      </label>
+
+                      <label className="notification-option-row">
+                        <input
+                          type="checkbox"
+                          checked={notifInApp}
+                          onChange={() => setNotifInApp(!notifInApp)}
+                        />
+                        <div className="option-text">
+                          <span className="option-title">In-App Notifications</span>
+                          <span className="option-desc">Show notification badges and messages inside the platform dashboard.</span>
+                        </div>
+                      </label>
+
+                      <label className="notification-option-row">
+                        <input
+                          type="checkbox"
+                          checked={notifSlack}
+                          onChange={() => setNotifSlack(!notifSlack)}
+                        />
+                        <div className="option-text">
+                          <span className="option-title">Slack Integration Alerts</span>
+                          <span className="option-desc">Push alerts directly to your connected team Slack channel.</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="email-action-row" style={{ marginTop: '24px' }}>
+                    <button type="submit" className="email-btn primary">
+                      Save Notification Preferences
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
           ) : activeTab === "Password" ? (
-            renderSimpleCard(Shield, "Security", "Password, two-factor authentication, and sessions.", "Update Security Settings")
+            <div className="password-settings-card">
+              <div className="password-settings-head">
+                <h2>
+                  <Shield size={16} />
+                  <span>Password Settings</span>
+                </h2>
+                <p>Update your account password and verify its strength.</p>
+              </div>
+
+              <form className="password-settings-form" onSubmit={handleUpdatePassword}>
+                {passwordSuccess && (
+                  <div className="email-status-banner success" style={{ marginBottom: '16px' }}>
+                    <Check size={14} />
+                    <span>{passwordSuccess}</span>
+                  </div>
+                )}
+
+                {passwordError && (
+                  <div className="email-status-banner error" style={{ marginBottom: '16px' }}>
+                    <AlertCircle size={14} />
+                    <span>{passwordError}</span>
+                  </div>
+                )}
+
+                <div className="password-field">
+                  <label htmlFor="current-password-input">Current Password</label>
+                  <div className="settings-input-wrapper">
+                    <input
+                      id="current-password-input"
+                      type={showCurrentPassword ? "text" : "password"}
+                      className="password-input-field"
+                      placeholder="Enter current password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="settings-input-toggle-btn"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      title={showCurrentPassword ? "Hide password" : "Show password"}
+                    >
+                      {showCurrentPassword ? <Eye size={16} /> : <EyeOff size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="password-field">
+                  <label htmlFor="new-password-input">New Password</label>
+                  <div className="settings-input-wrapper">
+                    <input
+                      id="new-password-input"
+                      type={showNewPassword ? "text" : "password"}
+                      className="password-input-field"
+                      placeholder="Enter new password (min. 8 characters)"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="settings-input-toggle-btn"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      title={showNewPassword ? "Hide password" : "Show password"}
+                    >
+                      {showNewPassword ? <Eye size={16} /> : <EyeOff size={16} />}
+                    </button>
+                  </div>
+
+                  {newPassword && (
+                    <div className="password-strength-container" style={{ animation: 'fadeIn 0.2s ease', marginTop: '8px' }}>
+                      <div className="password-strength-bar-bg" style={{ height: '6px', background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden', marginBottom: '6px' }}>
+                        <div
+                          className="password-strength-bar-fill"
+                          style={{
+                            height: '100%',
+                            transition: 'width 0.3s ease, background-color 0.3s ease',
+                            width: `${getPasswordStrength(newPassword).score}%`,
+                            backgroundColor: getPasswordStrength(newPassword).color
+                          }}
+                        />
+                      </div>
+                      <span className="password-strength-text" style={{ fontSize: '12px', color: '#64748b' }}>
+                        Password Strength: <strong style={{ color: getPasswordStrength(newPassword).color }}>{getPasswordStrength(newPassword).label}</strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="password-field">
+                  <label htmlFor="confirm-password-input">Confirm New Password</label>
+                  <div className="settings-input-wrapper">
+                    <input
+                      id="confirm-password-input"
+                      type={showConfirmPassword ? "text" : "password"}
+                      className="password-input-field"
+                      placeholder="Verify new password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="settings-input-toggle-btn"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      title={showConfirmPassword ? "Hide password" : "Show password"}
+                    >
+                      {showConfirmPassword ? <Eye size={16} /> : <EyeOff size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="email-action-row" style={{ marginTop: '12px' }}>
+                  <button type="submit" className="email-btn primary">
+                    Update Password
+                  </button>
+                </div>
+              </form>
+            </div>
           ) : activeTab === "Email" ? (
-            renderSimpleCard(Bell, "Email Preferences", "Manage delivery settings for extraction summaries and alerts.", "Update Email Settings")
-          ) : activeTab === "Plan" ? (
-            renderSimpleCard(CreditCard, "Plan", "View and manage your active subscription plan and limits.", "Manage Plan")
-          ) : activeTab === "My details" ? (
-            renderSimpleCard(User, "My Details", "Personal details used across your DocExtract workspace.", "Update Details")
+            <div className="email-settings-card">
+              <div className="email-settings-head">
+                <h2>
+                  <Mail size={16} />
+                  <span>Email Settings</span>
+                </h2>
+                <p>Update your account email address with secure OTP verification.</p>
+              </div>
+
+              <div className="email-settings-grid">
+                <div className="email-settings-field">
+                  <label>Current Email Address</label>
+                  <div className="email-current-box">
+                    <span>{userEmail}</span>
+                    <span style={{ fontSize: '11px', color: '#10b981', background: '#d1fae5', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>Verified</span>
+                  </div>
+                </div>
+
+                {emailSuccess && (
+                  <div className="email-status-banner success">
+                    <Check size={14} />
+                    <span>{emailSuccess}</span>
+                  </div>
+                )}
+
+                {emailError && (
+                  <div className="email-status-banner error">
+                    <AlertCircle size={14} />
+                    <span>{emailError}</span>
+                  </div>
+                )}
+
+                {!otpSent ? (
+                  <div className="email-settings-field">
+                    <label htmlFor="new-email-input">New Email Address</label>
+                    <div className="email-input-wrapper">
+                      <input
+                        id="new-email-input"
+                        type="email"
+                        className="email-input-field"
+                        placeholder="Enter new email address (e.g. alex@company.com)"
+                        value={newEmailInput}
+                        onChange={(e) => setNewEmailInput(e.target.value)}
+                      />
+                    </div>
+                    <div className="email-action-row" style={{ marginTop: '8px' }}>
+                      <button className="email-btn primary" onClick={handleSendOtp}>
+                        Send Verification OTP
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="email-settings-field" style={{ animation: 'fadeIn 0.3s ease' }}>
+                    <div className="email-status-banner info" style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                        <Activity size={14} strokeWidth={2.5} />
+                        <span>Mock Email Delivery Service</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '12px', color: '#1e40af', opacity: 0.9 }}>
+                        For testing purposes, please enter the following verification code: <strong style={{ fontSize: '14px', textDecoration: 'underline' }}>{generatedOtp}</strong>
+                      </p>
+                    </div>
+
+                    <label style={{ textAlign: 'center', display: 'block', marginBottom: '8px' }}>
+                      Enter the 6-digit verification code sent to <strong>{newEmailInput}</strong>
+                    </label>
+
+                    <div className="otp-inputs-row">
+                      {otpDigits.map((digit, idx) => (
+                        <input
+                          key={idx}
+                          ref={otpInputRefs[idx]}
+                          type="text"
+                          maxLength={1}
+                          className="otp-digit-input"
+                          value={digit}
+                          onChange={(e) => handleOtpChange(idx, e.target.value)}
+                          onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                          onPaste={handleOtpPaste}
+                          aria-label={`Digit ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="email-action-row" style={{ justifyContent: 'center' }}>
+                      <button className="email-btn secondary" onClick={handleCancelEmailChange}>
+                        Cancel
+                      </button>
+                      <button className="email-btn primary" onClick={handleVerifyOtp}>
+                        Verify & Update Email
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : activeTab === "Subscription" ? (
+            <div className="pricing-section">
+              <div className="pricing-badge">
+                <DollarSign size={13} />
+                <span>Our Pricing Plan</span>
+              </div>
+              <h2 className="pricing-title">Get started for free</h2>
+
+              <div className="subscriptions-container">
+                {/* Starter Plan */}
+                <div className="subscription-card">
+                  <div className="subscription-card-head">
+                    <h3>Starter</h3>
+                    <p>Your document extraction partner. Unlock instant, world-class parsing with a simple monthly plan.</p>
+                    <div className="subscription-card-price">Free Plan</div>
+                  </div>
+                  <button className="subscription-card-btn btn-starter" style={{ background: '#e2e8f0', color: '#64748b', cursor: 'default' }} disabled>
+                    <Check size={14} />
+                    <span>Using Plan</span>
+                  </button>
+                  <div className="subscription-features-title">GET STARTED WITH</div>
+                  <ul className="subscription-features-list">
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>1,000 free extractions</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>Speak ai Engine</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>5 Custom Template fields</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>10 Language models supported</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>Document export tools</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Pro Plan */}
+                <div className="subscription-card">
+                  <div className="subscription-card-head">
+                    <h3>Pro Plan</h3>
+                    <p>Your advanced document partner. Unlock instant, world-class extraction with a simple monthly fee.</p>
+                    <div className="subscription-card-price">$8.00 <span>/Month</span></div>
+                  </div>
+                  <button className="subscription-card-btn btn-pro" onClick={() => setActiveTab("Billings")}>
+                    <span>Get Pro Plan</span>
+                  </button>
+                  <div className="subscription-features-title">EVERYTHING IN STARTER</div>
+                  <ul className="subscription-features-list">
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>Unlimited extractions</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>Advanced AI parser</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>Avalon model support</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>800 Custom Template fields</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>Tune with custom prompts</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>API access integration</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Team Plan */}
+                <div className="subscription-card">
+                  <div className="subscription-card-head">
+                    <h3>Team Plan</h3>
+                    <p>Your team processing partner. Unlock instant, world-class workflow with a simple monthly fee.</p>
+                    <div className="subscription-card-price">$12.00 <span>/Month</span></div>
+                  </div>
+                  <button className="subscription-card-btn btn-team" onClick={() => setActiveTab("Billings")}>
+                    <span>Get Team Plan</span>
+                    <ChevronRight size={14} />
+                  </button>
+                  <div className="subscription-features-title">EVERYTHING IN PRO</div>
+                  <ul className="subscription-features-list">
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>Avalon model support</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>Centralized team billing</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>Team wide settings</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>Enforce privacy mode org-wide</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>Priority support</span>
+                    </li>
+                    <li className="subscription-feature-item">
+                      <Check size={14} />
+                      <span>Advanced Analytics Dashboard</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           ) : (
             renderSimpleCard(KeyRound, "API Keys", "Manage API access tokens for integrations.", "Manage API Keys")
           )}
@@ -1673,7 +2697,7 @@ function TemplateEditor({ templateId, onBack, onUseTemplate, initialTab = "overv
   };
 
   const removeDataPoint = (idx) => {
-    setEditDataPoints(editDataPoints.filter((_, i) => i !== idx));
+    setEditDataPoints(editDataPoints.filter((_, i) => i != idx));
   };
 
   const updateDp = (idx, key, val) => {
@@ -1798,7 +2822,13 @@ function TemplateEditor({ templateId, onBack, onUseTemplate, initialTab = "overv
                           onChange={e => updateDp(idx, 'field', e.target.value)}
                         />
                       </div>
-                      <button className="de-dp-delete-btn" onClick={() => removeDataPoint(idx)}>✕</button>
+                      <button 
+                        type="button"
+                        className="de-dp-delete-btn" 
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); removeDataPoint(idx); }}
+                      >
+                        ✕
+                      </button>
                     </div>
                     <div className="de-dp-item-body open">
                       <textarea
@@ -1912,6 +2942,28 @@ function TemplatesPage({ onUseTemplate }) {
     };
   }, []);
 
+  const handleDeleteTemplate = async (e, templateId) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this template? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/api/templates/${templateId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete template (${response.status})`);
+      }
+
+      setTemplates((prev) => prev.filter((t) => t.id !== templateId));
+      console.log(`Successfully deleted template ${templateId}`);
+    } catch (err) {
+      alert("Error deleting template: " + err.message);
+    }
+  };
+
   const getFields = (template) => {
     if (Array.isArray(template.data_points)) {
       return template.data_points.map((dp) => (typeof dp === "string" ? dp : dp?.field || "")).filter(Boolean);
@@ -1984,6 +3036,40 @@ function TemplatesPage({ onUseTemplate }) {
             const fields = getFields(template);
             const visibleFields = fields.slice(0, 5);
             const moreCount = Math.max(fields.length - visibleFields.length, 0);
+            
+            const getTemplateTheme = (name) => {
+              const lower = String(name).toLowerCase();
+              const baseTheme = {
+                bg: '#f8fafc',
+                color: '#475569',
+                tagBg: '#f1f5f9',
+                tagColor: '#475569',
+                tagBorder: '1px solid #cbd5e170'
+              };
+
+              if (lower.includes('health')) return { 
+                icon: <Activity size={18} strokeWidth={1.8} />, 
+                ...baseTheme
+              };
+              if (lower.includes('financ')) return { 
+                icon: <DollarSign size={18} strokeWidth={1.8} />, 
+                ...baseTheme
+              };
+              if (lower.includes('msa')) return { 
+                icon: <ShieldCheck size={18} strokeWidth={1.8} />, 
+                ...baseTheme
+              };
+              if (lower.includes('sow')) return { 
+                icon: <FileText size={18} strokeWidth={1.8} />, 
+                ...baseTheme
+              };
+              return { 
+                icon: <LayoutGrid size={18} strokeWidth={1.8} />, 
+                ...baseTheme
+              };
+            };
+            const theme = getTemplateTheme(template.name || template.template_name || "");
+
             return (
               <div
                 className="template-card"
@@ -1999,42 +3085,58 @@ function TemplatesPage({ onUseTemplate }) {
                 }}
               >
                 <div className="template-card-top">
-                  <span className="template-icon">
-                    <LayoutGrid size={15} />
-                  </span>
+                  <div className="template-card-header">
+                    <span className="template-icon" style={{ backgroundColor: theme.bg, color: theme.color }}>
+                      {theme.icon}
+                    </span>
+                    <div className="template-card-top-actions">
+                      <button
+                        className="template-card-edit-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInitialTab("datapoints");
+                          setSelectedTemplateId(template.id);
+                        }}
+                      >
+                        + Data Points
+                      </button>
+                      <button
+                        className="template-card-use-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onUseTemplate?.(template);
+                        }}
+                      >
+                        Use
+                      </button>
+                    </div>
+                  </div>
                   <h3>{template.name || template.template_name || "Untitled Template"}</h3>
                   <p>{getDescription(template, fields)}</p>
                 </div>
 
                 <div className="template-tags">
                   {getRelatedWords(template, visibleFields).map((field) => (
-                    <span key={field} className="template-tag">{field}</span>
+                    <span key={field} className="template-tag" style={{ backgroundColor: theme.tagBg, color: theme.tagColor, border: theme.tagBorder }}>
+                      {field}
+                    </span>
                   ))}
-                  {moreCount > 0 && <span className="template-tag">+{moreCount} more</span>}
+                  {moreCount > 0 && <span className="template-tag" style={{ backgroundColor: '#f8fafc', color: '#94a3b8', border: '1px solid #cbd5e170' }}>+{moreCount} more</span>}
                 </div>
 
                 <div className="template-card-foot">
-                  <span><Hash size={12} /> {fields.length} fields</span>
-                  <span><Clock3 size={12} /> {getUpdatedText(template)}</span>
+                  <span><Users size={14} /> {fields.length} fields</span>
+                  <span><Calendar size={14} /> {getUpdatedText(template)}</span>
                   <div className="template-card-actions">
                     <button
-                      className="template-card-edit-btn"
+                      className="template-card-delete-btn"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setInitialTab("datapoints");
-                        setSelectedTemplateId(template.id);
+                        e.preventDefault();
+                        handleDeleteTemplate(e, template.id);
                       }}
                     >
-                      + Data Points
-                    </button>
-                    <button
-                      className="template-card-use-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onUseTemplate?.(template);
-                      }}
-                    >
-                      Use
+                      <Trash2 size={14} /> Delete
                     </button>
                   </div>
                 </div>
@@ -2066,6 +3168,41 @@ export default function DocExtract() {
   const [preset, setPreset] = useState("");
   const [activeNav, setActiveNav] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("Billings");
+  const [notifications, setNotifications] = useState([
+    {
+      id: 1,
+      title: "Extraction Successful",
+      description: "medical_field.pdf was processed and 4/4 fields were extracted.",
+      time: "2 hours ago",
+      unread: true,
+      type: "success"
+    },
+    {
+      id: 2,
+      title: "Review Required",
+      description: "invoice_9918.pdf contains 2 fields flagged with low confidence scores.",
+      time: "5 hours ago",
+      unread: true,
+      type: "warning"
+    },
+    {
+      id: 3,
+      title: "Storage Warning",
+      description: "Your workspace has used 65% of the allocated storage limit.",
+      time: "1 day ago",
+      unread: false,
+      type: "info"
+    },
+    {
+      id: 4,
+      title: "Integrations Reconnected",
+      description: "Google Drive account was successfully reconnected by Alex Johnson.",
+      time: "2 days ago",
+      unread: false,
+      type: "success"
+    }
+  ]);
   const [verifyMode, setVerifyMode] = useState(false);
   const [verifiedFields, setVerifiedFields] = useState({}); // { fieldKey: "approved"|"flagged"|"pending" }
   const [editedResult, setEditedResult] = useState({});     // { fieldKey: editedValue }
@@ -2079,6 +3216,14 @@ export default function DocExtract() {
   const [driveSearch, setDriveSearch] = useState("");
   const [driveSelectingId, setDriveSelectingId] = useState(null);
   const [driveConnected, setDriveConnected] = useState(false);
+
+  const [oneDriveModalOpen, setOneDriveModalOpen] = useState(false);
+  const [oneDriveFiles, setOneDriveFiles] = useState([]);
+  const [oneDriveLoading, setOneDriveLoading] = useState(false);
+  const [oneDriveError, setOneDriveError] = useState("");
+  const [oneDriveSearch, setOneDriveSearch] = useState("");
+  const [oneDriveSelectingId, setOneDriveSelectingId] = useState(null);
+  const [oneDriveConnected, setOneDriveConnected] = useState(false);
 
   useEffect(() => {
     // Clear results when file or data points change
@@ -2107,9 +3252,13 @@ export default function DocExtract() {
     clearFile();
     if (source === "drive") {
       setDriveError("");
+    } else if (source === "onedrive") {
+      setOneDriveError("");
     } else {
       setDriveModalOpen(false);
       setDriveSearch("");
+      setOneDriveModalOpen(false);
+      setOneDriveSearch("");
     }
   };
 
@@ -2200,6 +3349,83 @@ export default function DocExtract() {
     item.name.toLowerCase().includes(driveSearch.trim().toLowerCase())
   );
 
+  const fetchOneDriveFiles = async () => {
+    setOneDriveLoading(true);
+    setOneDriveError("");
+    try {
+      const statusRes = await fetch(`${BACKEND_URL}/onedrive/auth/status`, { credentials: "include" });
+      const statusData = await statusRes.json().catch(() => ({}));
+      const connected = Boolean(statusData.connected);
+      setOneDriveConnected(connected);
+
+      if (!connected) {
+        setOneDriveFiles([]);
+        setOneDriveError("Connect Microsoft OneDrive in Integrations first.");
+        return;
+      }
+
+      const res = await fetch(`${BACKEND_URL}/onedrive/files`, { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load OneDrive files.");
+      }
+
+      setOneDriveFiles(Array.isArray(data.files) ? data.files : []);
+    } catch (err) {
+      setOneDriveError(err.message || "Failed to load OneDrive files.");
+    } finally {
+      setOneDriveLoading(false);
+    }
+  };
+
+  const openOneDrivePicker = async () => {
+    setOneDriveModalOpen(true);
+    setOneDriveSearch("");
+    await fetchOneDriveFiles();
+  };
+
+  const closeOneDrivePicker = () => {
+    setOneDriveModalOpen(false);
+    setOneDriveSearch("");
+    setOneDriveError("");
+  };
+
+  const importOneDriveFile = async (oneDriveFile) => {
+    setOneDriveSelectingId(oneDriveFile.id);
+    setOneDriveError("");
+    try {
+      const res = await fetch(`${BACKEND_URL}/onedrive/files/${encodeURIComponent(oneDriveFile.id)}`, {
+        credentials: "include",
+      });
+
+      const blob = await res.blob();
+      if (!res.ok) {
+        const message = await blob.text().catch(() => "");
+        throw new Error(message || "Failed to download OneDrive file.");
+      }
+
+      const pdfFile = new File(
+        [blob],
+        oneDriveFile.name.toLowerCase().endsWith(".pdf") ? oneDriveFile.name : `${oneDriveFile.name}.pdf`,
+        { type: "application/pdf" }
+      );
+
+      applyFile(pdfFile);
+      setOneDriveModalOpen(false);
+      setOneDriveSearch("");
+      setError("");
+    } catch (err) {
+      setOneDriveError(err.message || "Failed to import OneDrive file.");
+    } finally {
+      setOneDriveSelectingId(null);
+    }
+  };
+
+  const filteredOneDriveFiles = oneDriveFiles.filter((item) =>
+    item.name.toLowerCase().includes(oneDriveSearch.trim().toLowerCase())
+  );
+
   const useTemplateForExtraction = (template) => {
     const name = template?.name || template?.template_name || "";
     const apiDataPoints = Array.isArray(template?.data_points) ? template.data_points : [];
@@ -2271,7 +3497,7 @@ export default function DocExtract() {
   };
 
   const removeDataPoint = (id) => {
-    setDataPoints((prev) => prev.filter((d) => d.id !== id));
+    setDataPoints((prev) => prev.filter((d) => d.id != id));
     setExpanded((prev) => { const n = { ...prev }; delete n[id]; return n; });
   };
 
@@ -2656,12 +3882,28 @@ export default function DocExtract() {
             filteredDriveFiles={filteredDriveFiles}
             importDriveFile={importDriveFile}
             driveSelectingId={driveSelectingId}
+            openOneDrivePicker={openOneDrivePicker}
+            oneDriveModalOpen={oneDriveModalOpen}
+            closeOneDrivePicker={closeOneDrivePicker}
+            oneDriveSearch={oneDriveSearch}
+            setOneDriveSearch={setOneDriveSearch}
+            oneDriveLoading={oneDriveLoading}
+            oneDriveError={oneDriveError}
+            oneDriveConnected={oneDriveConnected}
+            filteredOneDriveFiles={filteredOneDriveFiles}
+            importOneDriveFile={importOneDriveFile}
+            oneDriveSelectingId={oneDriveSelectingId}
           />
         )}
 
         {/* Dashboard - Empty for now */}
         {activeNav === "dashboard" && (
-          <Dashboard setActiveNav={setActiveNav} />
+          <Dashboard
+            setActiveNav={setActiveNav}
+            setSettingsTab={setSettingsTab}
+            notifications={notifications}
+            setNotifications={setNotifications}
+          />
         )}
 
         {/* Templates - Empty for now */}
@@ -2681,7 +3923,12 @@ export default function DocExtract() {
 
         {/* Settings - Empty for now */}
         {activeNav === "settings" && (
-          <SettingsPage />
+          <SettingsPage
+            activeTab={settingsTab}
+            setActiveTab={setSettingsTab}
+            notifications={notifications}
+            setNotifications={setNotifications}
+          />
         )}
 
         {/* Profile */}

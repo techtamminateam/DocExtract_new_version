@@ -3,7 +3,7 @@
   background-color: var(--bg-primary, #f5f6fa); /* match dashboard background */
   min-height: 100vh;
   box-sizing: border-box;
-  font-family: var(--font-main, 'Inter', sans-serif);
+  font-family: var(--font-main, 'Plus Jakarta Sans', 'Outfit', sans-serif);
 }
 
 .profile-header {

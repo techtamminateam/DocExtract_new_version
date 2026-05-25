@@ -1,6 +1,7 @@
-from flask import Flask, redirect, request, session, url_for, Blueprint
+from flask import Flask, redirect, request, session, url_for, Blueprint, jsonify, send_file
 import requests
 import os
+from io import BytesIO
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -41,33 +42,83 @@ def auth_callback():
         "code": code,
         "redirect_uri": REDIRECT_URI,
         "grant_type": "authorization_code",
-        "client_secret": CLIENT_SECRET,
     }
 
     response = requests.post(token_url, data=data)
     token_data = response.json()
 
-    session["access_token"] = token_data["access_token"]
+    session["onedrive_access_token"] = token_data.get("access_token")
     
     return "Login successful! Now fetch files from /files"
 
 @one_drive_bp.route("/onedrive/files")
 def get_files():
-    access_token = session.get("access_token")
+    access_token = session.get("onedrive_access_token")
+    if not access_token:
+        return jsonify({"error": "Not authenticated"}), 401
     
-    headers ={
+    headers = {
         "Authorization": f"Bearer {access_token}"
     }
 
     url = "https://graph.microsoft.com/v1.0/me/drive/root/children"
     response = requests.get(url, headers=headers)
-    files = response.json()
+    if not response.ok:
+        return jsonify({"error": "Failed to fetch files"}), response.status_code
 
-    return files
+    data = response.json()
+    items = data.get("value", [])
+    
+    pdf_files = []
+    for item in items:
+        # Check if it is a file and a PDF
+        if "file" in item:
+            mime = item.get("file", {}).get("mimeType", "")
+            if mime == "application/pdf" or item.get("name", "").lower().endswith(".pdf"):
+                pdf_files.append({
+                    "id": item.get("id"),
+                    "name": item.get("name")
+                })
+                
+    return jsonify({"files": pdf_files})
+
+@one_drive_bp.route("/onedrive/files/<path:file_id>", methods=["GET"])
+def download_onedrive_file(file_id):
+    access_token = session.get("onedrive_access_token")
+    if not access_token:
+        return jsonify({"error": "Not authenticated"}), 401
+
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
+
+    url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_id}/content"
+    res = requests.get(url, headers=headers)
+
+    if not res.ok:
+        return jsonify({"error": "Failed to download OneDrive file"}), res.status_code
+
+    meta_url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_id}"
+    meta_res = requests.get(meta_url, headers=headers)
+    filename = "document.pdf"
+    if meta_res.ok:
+        filename = meta_res.json().get("name", "document.pdf")
+
+    return send_file(
+        BytesIO(res.content),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename
+    )
 
 @one_drive_bp.route("/onedrive/auth/status")
 def onedrive_status():
-    if "access_token" in session:
-        return {"connected": True}
+    if "onedrive_access_token" in session:
+        return jsonify({"connected": True})
     else:
-        return {"connected": False}
+        return jsonify({"connected": False})
+
+@one_drive_bp.route("/onedrive/auth/disconnect", methods=["POST"])
+def onedrive_disconnect():
+    session.pop("onedrive_access_token", None)
+    return jsonify({"connected": False})
