@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -24,7 +24,7 @@
   --text:       #09090B;
   --text-dim:   #52525B;
   --text-muted: #A1A1AA;
-  --sans:       "Inter", system-ui, -apple-system, sans-serif;
+  --sans:       "Plus Jakarta Sans", "Outfit", system-ui, -apple-system, sans-serif;
   --r:          8px;
   --r-lg:       16px;
 }
@@ -258,39 +258,57 @@
   font-size: 12px;
   font-weight: 600;
   padding: 6px 12px;
-  border-radius: var(--r);
+  border-radius: 6px;
   border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.2s ease;
   outline: none;
+  white-space: nowrap;
 }
 
 .btn.primary {
-  color: var(--cyan);
-  background-color: var(--cyan-glow);
+  color: #4f46e5;
+  background-color: #f5f3ff;
+  border: 1px solid #ddd6fe;
 }
 
 .btn.primary:hover {
-  background-color: rgba(79, 70, 229, 0.25);
+  background-color: #ede9fe;
+  border-color: #c4b5fd;
+  color: #4338ca;
 }
 
 .btn.secondary {
-  color: var(--text-dim);
-  background-color: var(--surface2);
+  color: #4b5563;
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
 }
 
 .btn.secondary:hover {
-  background-color: var(--border2);
-  color: var(--text);
+  background-color: #e5e7eb;
+  border-color: #d1d5db;
+  color: #1f2937;
 }
 
 .btn.danger {
-  color: var(--red);
-  background-color: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  background-color: #fef2f2;
+  border: 1px solid #fee2e2;
 }
 
 .btn.danger:hover {
-  background-color: rgba(239, 68, 68, 0.2);
+  background-color: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.actions-cell {
+  min-width: 260px;
+  width: 260px;
+}
+
+.actions-header {
+  width: 260px;
 }
 
 .date-icon{

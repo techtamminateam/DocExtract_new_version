@@ -55,7 +55,7 @@ def auth_google():
         "client_id": CLIENT_ID,
         "redirect_uri": REDIRECT_URI,
         "response_type": "code",
-        "scope": "https://www.googleapis.com/auth/drive.readonly",
+        "scope": "openid email profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets",
         "access_type": "offline",
         "prompt": "consent",
         "state": state
@@ -91,6 +91,23 @@ def auth_callback():
     session["access_token"] = token_response.get("access_token")
     session["refresh_token"] = token_response.get("refresh_token")
 
+    # Fetch Google profile info
+    user_res = requests.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={
+            "Authorization": f"Bearer {session['access_token']}"
+        }
+    )
+
+    user_data = user_res.json()
+
+    # Store user in session
+    session["user"] = {
+        "name": user_data.get("name"),
+        "email": user_data.get("email"),
+        "picture": user_data.get("picture"),
+    }
+
     # redirect back to React app
     return redirect("http://localhost:3000")
 
@@ -99,7 +116,8 @@ def auth_callback():
 @integration_bp.route("/auth/status")
 def auth_status():
     return jsonify({
-        "connected": "access_token" in session
+        "connected": "access_token" in session,
+        "user": session.get("user")
     })
 
 # 🔌 Step 3b: Disconnect from Drive

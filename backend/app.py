@@ -19,35 +19,57 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
 from flask_sqlalchemy import SQLAlchemy
-from config import Config, UploadConfig
+from config import Config, UploadConfig, MailConfig
+from flask_jwt_extended import JWTManager
+from flask_bcrypt import Bcrypt
 
-from models import db, ExtractionRecord, ExtractionResultStatus, Template
+from models import db, ExtractionRecord, ExtractionResultStatus, Template, User, ChatHistory
 from routes.history import history_bp
 from routes.dashboard import result_status_bp
 from routes.templates_tab import template_bp
 from routes.integration import integration_bp
 from routes.oneDrive import one_drive_bp
+from routes.google_sheets import sheets_bp
+from routes.chatbot import chatbot_bp
+from routes.login import login_bp
+from flask_mail import Mail, Message
 
-
+mail = Mail()
 
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 app = Flask(__name__)
+# Load configs FIRST
+app.config.from_object(Config)
 app.config.from_object(UploadConfig)
+app.config.from_object(MailConfig)
+
+# Secret keys
 app.secret_key = "nvjkfdskjgbvabjgsdsbsggbui"
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
+
+# Initialize extensions
+db.init_app(app)
+mail.init_app(app)
+
+jwt = JWTManager(app)
+bcrypt = Bcrypt(app)
+
+# CORS
+CORS(app, supports_credentials=True)
 
 app.register_blueprint(history_bp, url_prefix="/api")
 app.register_blueprint(result_status_bp, url_prefix="/api")
 app.register_blueprint(template_bp, url_prefix="/api")
 app.register_blueprint(integration_bp, url_prefix="/api")
 app.register_blueprint(one_drive_bp, url_prefix="/api")
+app.register_blueprint(sheets_bp, url_prefix="/api")
+app.register_blueprint(chatbot_bp, url_prefix="/api")
+app.register_blueprint(login_bp, url_prefix="/api")
 
 
-CORS(app, supports_credentials=True)
 
-app.config.from_object(Config)
-db.init_app(app)
 
 with app.app_context():
     db.create_all()
@@ -63,9 +85,18 @@ with app.app_context():
             "Legal Documents": LEGAL_TEMPLATE,
             "SOW Extraction": SOW_TEMPLATE
         }
+        DATAPOINTS = {
+            "Health Care Documents": HEALTHCARE_DATA_POINTS,
+            "Financial Statements": FINANCIAL_DATA_POINTS,
+            "MSA Extraction": MSA_DATA_POINTS,
+            "Invoice Checking": INVOICE_DATA_POINTS,
+            "Legal Documents": LEGAL_DATA_POINTS,
+            "SOW Extraction": SOW_DATA_POINTS
+        }
         try:
             for template_name, template_content in TEMPLATES.items():
-                template = Template(template_name=template_name, template_content=template_content)
+                data_points = DATAPOINTS.get(template_name, [])
+                template = Template(template_name=template_name, template_content=template_content, data_points=json.dumps(data_points) if data_points else None)
                 db.session.add(template)
             db.session.commit()
             print("Default templates created successfully.")
@@ -346,12 +377,13 @@ def get_template(template_name):
 def extract():
     """
     Multipart form fields:
-      - pdf          : the PDF file
+      - pdf          : one or more PDF files
       - data_points  : JSON array of objects:
                        [{ "field": "Policy Number", "prompt": "Return only the policy number..." }, ...]
     """
-    if "pdf" not in request.files:
-        return jsonify({"error": "No PDF file provided"}), 400
+    pdf_files = request.files.getlist("pdf")
+    if not pdf_files or len(pdf_files) == 0:
+        return jsonify({"error": "No PDF files provided"}), 400
 
     raw_dp = request.form.get("data_points", "[]")
     template_name = request.form.get("preset", "default_template")
@@ -368,139 +400,189 @@ def extract():
     except (json.JSONDecodeError, ValueError) as exc:
         return jsonify({"error": str(exc)}), 400
 
-    pdf_file = request.files["pdf"]
-    suffix   = os.path.splitext(pdf_file.filename)[1] or ".pdf"
+    # Initialize result containers
+    all_results = {}
+    processing_times = []
+    overall_start = time.perf_counter()
     
-    # Save to uploads folder first
-    file_path = os.path.join(app.config["UPLOAD_FOLDER"], pdf_file.filename)
-    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-    pdf_file.save(file_path)
-    
-    # Create a temp copy for processing
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        with open(file_path, 'rb') as f:
-            tmp.write(f.read())
-        tmp_path = tmp.name
-
-    try:
-        p            = get_pipeline()
-        ppp          = p["ppp"]
-        gemini_model = p["gemini_model"]
-        encoding     = p["encoding"]
-
-        # ── 1. Parallel PDF text extraction ───────────────────────────────────
-        t_pdf = time.perf_counter()
-        logger.info(f"[1/3] Parallel page extraction  workers={MAX_PAGE_WORKERS}")
-        large_text = text_extract_parallel(tmp_path)
-        with open("extracted_text.txt", "w", encoding="utf-8") as f:
-            f.write(large_text)
-        logger.info(f"[1/3] Done  ({time.perf_counter()-t_pdf:.2f}s)")
-
-        # ── 2. Token-aware context window ─────────────────────────────────────
-        pdf_tokens = len(encoding.encode(large_text))
-        logger.info(f"[2/3] PDF tokens: {pdf_tokens}")
-
-        if pdf_tokens > 40000:
-            logger.info("[2/3] Large doc — building FAISS retriever")
-            texts        = ppp.split_text(large_text, 4000, buffer=400)
-            vectorstore  = ppp.create_vectorstore(texts)
-            retriever    = vectorstore.as_retriever(search_kwargs={"k": 3})
+    # Process each PDF file
+    for pdf_file in pdf_files:
+        if not pdf_file or pdf_file.filename == '':
+            continue
             
-            # Build a rich FAISS query that includes field names, their prompts, AND common financial keywords
-            # This helps the retriever find not just the field mentions, but also the actual financial data sections
-            field_parts = []
-            for dp in data_points:
-                field_parts.append(dp["field"])
-            
-            # Add common financial extraction terms to improve retrieval
-            common_financial_terms = [
-                "Balance Sheet", "Statement of Profit and Loss", "Cash Flow Statement",
-                "Total Assets", "Total Liabilities", "Revenue", "Net Income", "Gross Profit",
-                "Operating Income", "EBITDA", "Cash and Cash Equivalents", "Current Assets",
-                "Current Liabilities", "Total Debt", "Interest Expense", "Operating Cash Flow",
-                "Capital Expenditure", "Free Cash Flow", "Share Capital", "Reserves", "Equity"
-            ]
-            field_parts.extend(common_financial_terms)
-            
-            query = " ".join(field_parts)[:1500]   # cap at 1500 chars
-            logger.info(f"[2/3] FAISS query (enriched): {query[:150]}...")
-            
-            docs         = retriever.get_relevant_documents(query)
-            logger.info(f"[2/3] Retrieved {len(docs)} top chunks from FAISS")
-            for i, doc in enumerate(docs, 1):
-                logger.debug(f"  Chunk {i}: {doc.page_content[:100]}...")
-            
-            combined_text = "\n\n".join([d.page_content for d in docs])
-            
-            # DEBUG: Save FAISS chunks to file
-            with open("faiss_chunks.txt", "w", encoding="utf-8") as f:
-                f.write(f"Query: {query}\n")
-                f.write(f"Total Chunks Retrieved: {len(docs)}\n")
-                f.write("="*80 + "\n\n")
-                for i, doc in enumerate(docs, 1):
-                    f.write(f"--- CHUNK {i} ---\n{doc.page_content}\n\n")
-            logger.info(f"[2/3] Saved FAISS chunks to faiss_chunks.txt")
-        else:
-            combined_text = large_text
-
-        # ── 3. Batch field extraction (single API call) ───────────────────────────
-        t_fields = time.perf_counter()
-        n        = len(data_points)
-        
-        # Count tokens being sent to LLM
-        context_tokens = len(encoding.encode(combined_text))
-        logger.info(f"[3/3] Batch field extraction  fields={n}  context_tokens={context_tokens}")
-
-        selected_template = get_template(template_name)
-
-
-        # Extract ALL fields in a single Gemini API call
-        results = extract_all_fields(data_points, combined_text, gemini_model, selected_template)
-
-        logger.info(f"[3/3] Done  ({time.perf_counter()-t_fields:.2f}s)")
-        
-        timestamp = datetime.now()
-        extraction_record = ExtractionRecord(
-            pdf_filename=pdf_file.filename,
-            data_points=data_points,
-            results=results,
-            template_name=template_name,
-            timestamp=timestamp
-        )
-        db.session.add(extraction_record)
-        db.session.commit()
-
-        # ── Save initial result status with all fields as "pending" ──────────
-        result_status = {dp["field"]: "pending" for dp in data_points}
-        
-        # Check if status record already exists
-        existing_status = ExtractionResultStatus.query.filter_by(
-            pdf_filename=pdf_file.filename
-        ).first()
-        
-        if existing_status:
-            existing_status.result_status = result_status
-            logger.info(f"Updated result status for: {pdf_file.filename}")
-        else:
-            status_record = ExtractionResultStatus(
-                pdf_filename=pdf_file.filename,
-                result_status=result_status
-            )
-            db.session.add(status_record)
-            logger.info(f"Created initial result status (pending) for: {pdf_file.filename}")
-        
-        db.session.commit()
-        
-        return jsonify({"status": "success", "data": results})
-    except Exception as exc:
-        logger.error(f"Pipeline failed: {exc}", exc_info=True)
-        return jsonify({"error": str(exc)}), 500
-
-    finally:
+        file_key = pdf_file.filename
         try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+            logger.info(f"\n{'='*80}")
+            logger.info(f"Processing file: {file_key}")
+            logger.info(f"{'='*80}")
+            
+            file_start = time.perf_counter()
+            suffix = os.path.splitext(pdf_file.filename)[1] or ".pdf"
+            
+            # Save to uploads folder first
+            os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+            file_path = os.path.join(app.config["UPLOAD_FOLDER"], pdf_file.filename)
+            pdf_file.save(file_path)
+            
+            # Create a temp copy for processing
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                with open(file_path, 'rb') as f:
+                    tmp.write(f.read())
+                tmp_path = tmp.name
+
+            try:
+                p            = get_pipeline()
+                ppp          = p["ppp"]
+                gemini_model = p["gemini_model"]
+                encoding     = p["encoding"]
+
+                # ── 1. Parallel PDF text extraction ───────────────────────────────────
+                t_pdf = time.perf_counter()
+                logger.info(f"[1/3] Parallel page extraction  workers={MAX_PAGE_WORKERS}")
+                large_text = text_extract_parallel(tmp_path)
+                with open("extracted_text.txt", "w", encoding="utf-8") as f:
+                    f.write(large_text)
+                logger.info(f"[1/3] Done  ({time.perf_counter()-t_pdf:.2f}s)")
+
+                # ── 2. Token-aware context window ─────────────────────────────────────
+                pdf_tokens = len(encoding.encode(large_text))
+                logger.info(f"[2/3] PDF tokens: {pdf_tokens}")
+
+                if pdf_tokens > 40000:
+                    logger.info("[2/3] Large doc — building FAISS retriever")
+                    texts        = ppp.split_text(large_text, 4000, buffer=400)
+                    vectorstore  = ppp.create_vectorstore(texts)
+                    retriever    = vectorstore.as_retriever(search_kwargs={"k": 3})
+                    
+                    # Build a rich FAISS query that includes field names, their prompts, AND common financial keywords
+                    # This helps the retriever find not just the field mentions, but also the actual financial data sections
+                    field_parts = []
+                    for dp in data_points:
+                        field_parts.append(dp["field"])
+                    
+                    # Add common financial extraction terms to improve retrieval
+                    common_financial_terms = [
+                        "Balance Sheet", "Statement of Profit and Loss", "Cash Flow Statement",
+                        "Total Assets", "Total Liabilities", "Revenue", "Net Income", "Gross Profit",
+                        "Operating Income", "EBITDA", "Cash and Cash Equivalents", "Current Assets",
+                        "Current Liabilities", "Total Debt", "Interest Expense", "Operating Cash Flow",
+                        "Capital Expenditure", "Free Cash Flow", "Share Capital", "Reserves", "Equity"
+                    ]
+                    field_parts.extend(common_financial_terms)
+                    
+                    query = " ".join(field_parts)[:1500]   # cap at 1500 chars
+                    logger.info(f"[2/3] FAISS query (enriched): {query[:150]}...")
+                    
+                    docs         = retriever.get_relevant_documents(query)
+                    logger.info(f"[2/3] Retrieved {len(docs)} top chunks from FAISS")
+                    for i, doc in enumerate(docs, 1):
+                        logger.debug(f"  Chunk {i}: {doc.page_content[:100]}...")
+                    
+                    combined_text = "\n\n".join([d.page_content for d in docs])
+                    
+                    # DEBUG: Save FAISS chunks to file
+                    with open("faiss_chunks.txt", "w", encoding="utf-8") as f:
+                        f.write(f"Query: {query}\n")
+                        f.write(f"Total Chunks Retrieved: {len(docs)}\n")
+                        f.write("="*80 + "\n\n")
+                        for i, doc in enumerate(docs, 1):
+                            f.write(f"--- CHUNK {i} ---\n{doc.page_content}\n\n")
+                    logger.info(f"[2/3] Saved FAISS chunks to faiss_chunks.txt")
+                else:
+                    combined_text = large_text
+
+                # ── 3. Batch field extraction (single API call) ───────────────────────────
+                t_fields = time.perf_counter()
+                n        = len(data_points)
+                
+                # Count tokens being sent to LLM
+                context_tokens = len(encoding.encode(combined_text))
+                logger.info(f"[3/3] Batch field extraction  fields={n}  context_tokens={context_tokens}")
+
+                selected_template = get_template(template_name)
+
+                # Extract ALL fields in a single Gemini API call
+                results = extract_all_fields(data_points, combined_text, gemini_model, selected_template)
+
+                logger.info(f"[3/3] Done  ({time.perf_counter()-t_fields:.2f}s)")
+                
+                file_processing_time = time.perf_counter() - file_start
+                processing_times.append(file_processing_time)
+                
+                # Store result for this file
+                all_results[file_key] = {
+                    "extracted_fields": results,
+                    "file_status": "success",
+                    "processing_time": round(file_processing_time, 2)
+                }
+                
+                # Save to database
+                timestamp = datetime.now()
+                extraction_record = ExtractionRecord(
+                    pdf_filename=pdf_file.filename,
+                    data_points=data_points,
+                    results=results,
+                    template_name=template_name,
+                    timestamp=timestamp
+                )
+                db.session.add(extraction_record)
+                db.session.commit()
+
+                # ── Save initial result status with all fields as "pending" ──────────
+                result_status = {field["field"]: {"status": "pending", "value": None} for field in data_points}
+                
+                # Check if status record already exists
+                existing_status = ExtractionResultStatus.query.filter_by(
+                    pdf_filename=pdf_file.filename
+                ).first()
+                
+                if existing_status:
+                    existing_status.result_status = result_status
+                    logger.info(f"Updated result status for: {pdf_file.filename}")
+                else:
+                    status_record = ExtractionResultStatus(
+                        pdf_filename=pdf_file.filename,
+                        result_status=result_status
+                    )
+                    db.session.add(status_record)
+                    logger.info(f"Created initial result status (pending) for: {pdf_file.filename}")
+                
+                db.session.commit()
+                
+            except Exception as exc:
+                logger.error(f"Processing failed for {file_key}: {exc}", exc_info=True)
+                all_results[file_key] = {
+                    "error": str(exc),
+                    "file_status": "failed"
+                }
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                    
+        except Exception as exc:
+            logger.error(f"File processing error for {file_key}: {exc}", exc_info=True)
+            all_results[file_key] = {
+                "error": str(exc),
+                "file_status": "failed"
+            }
+    
+    # Calculate summary
+    total_time = time.perf_counter() - overall_start
+    successful = sum(1 for v in all_results.values() if v.get("file_status") == "success")
+    failed = sum(1 for v in all_results.values() if v.get("file_status") == "failed")
+    
+    return jsonify({
+        "status": "completed",
+        "results": all_results,
+        "summary": {
+            "total_files": len(all_results),
+            "successful": successful,
+            "failed": failed,
+            "total_time": round(total_time, 2)
+        }
+    })
 
 
 @app.route("/api/health", methods=["GET"])

@@ -1,3 +1,6 @@
+from sqlalchemy import label
+
+
 FINANCIAL_TEMPLATE = """
 You are an expert financial document data extraction engine.
 
@@ -125,6 +128,22 @@ Before extracting any field:
 
 Return only structured output as instructed separately.
 """
+
+FINANCIAL_DATA_POINTS = [
+  {
+    'field': "Revenue",
+    'prompt': "Extract the total revenue or total income for the period from the Profit & Loss statement or Income Statement. Look for 'Total Revenue', 'Total Income', 'Net Revenue', or 'Revenue from operations'. Return only the numerical value."
+  },
+  {
+    'field': "Net Income",
+    'prompt': "Extract the net income or profit attributable to shareholders from the Profit & Loss statement. Look for 'Net Income', 'Profit for the period', 'Profit after tax', or 'Earnings for the period'. Return only the numerical value."
+  },
+  {
+    'field': "Gross Profit",
+    'prompt': "Extract gross profit from the Profit & Loss statement. Look for 'Gross Profit' line item. Return only the numerical value."
+  },
+]
+
 
 HEALTHCARE_TEMPLATE = """
 You are an expert healthcare document data extraction engine.
@@ -269,6 +288,24 @@ Before extracting any field:
 Return only structured output as instructed separately.
 """
 
+HEALTHCARE_DATA_POINTS = [{
+    "field": "Patient Name",
+    "prompt": "Extract the full name of the patient as it appears in the document. Return only the patient name string."
+},
+{
+    "field": "Admission Date",
+    "prompt": "Extract the admission date of the patient. Return in format MM/DD/YYYY."
+},
+{
+    "field": "Discharge Date",
+    "prompt": "Extract the discharge date of the patient. Return in format MM/DD/YYYY."
+},
+{
+    "field": "Total Amount",
+    "prompt": "Extract the total amount payable as stated in the bill. Look for 'Total', 'Grand Total', or 'Net Payable'. Return only the numerical value."
+}]
+
+
 MSA_TEMPLATE = """
 You are an expert legal document data extraction engine specializing in contracts and Master Service Agreements (MSA).
 
@@ -411,6 +448,22 @@ Before extracting any field:
 
 Return only structured output as instructed separately.
 """
+
+MSA_DATA_POINTS = [
+    {
+        "field": "Effective Date",
+        "prompt": "Extract the effective date of the agreement. Return in format MM/DD/YYYY."
+    },
+    {
+        "field": "Client Name",
+        "prompt": "Extract the full legal name of the client/customer as stated in the agreement."
+    },
+    {
+        "field": "Service Provider Name",
+        "prompt": "Extract the full legal name of the service provider/vendor as stated in the agreement."
+    },
+]
+
 
 INVOICE_TEMPLATE = """
 You are an expert invoice data extraction engine.
@@ -561,6 +614,43 @@ Before extracting any field:
 Return only structured output as instructed separately.
 """
 
+INVOICE_DATA_POINTS = [
+    {
+    "field": "Policy Number",
+    "prompt": "Extract the policy number exactly as it appears. Return only the policy number string, no surrounding text.",
+  },
+  {
+    "field": "Name Insured",
+    "prompt": "Extract the primary named insured. Return the full legal name as a string.",
+  },
+  {
+    "field": "Policy Period",
+    "prompt": "Extract the policy period dates. Return in format MM/DD/YYYY to MM/DD/YYYY.",
+  },
+  {
+    "field": "Premium",
+    "prompt": "Extract the total premium amount including any breakdowns. Return as a string with dollar sign.",
+  },
+  {
+    "field": "Issuing Company",
+    "prompt": "Extract the name of the insurance company issuing this policy.",
+  },
+  {
+    "field": "Mailing Address",
+    "prompt": "Extract the mailing address of the named insured. Return as a single formatted address string.",
+  },
+  {
+    "field": "Deductible",
+    "prompt": "Extract all deductible amounts and types. Return as a string or object with labels and values.",
+  },
+  {
+    "field": "Endorsements",
+    "prompt": "Extract all endorsements — list changes, additions, deletions, and modifications. Return as an array of strings.",
+  }
+]
+
+
+
 LEGAL_TEMPLATE = """
 You are an expert legal document data extraction engine.
 
@@ -704,6 +794,27 @@ Before extracting any field:
 
 Return only structured output as instructed separately.
 """
+
+LEGAL_DATA_POINTS = [
+    {
+    "field": "Document Type",
+    "prompt": "Identify the type of legal document (e.g., agreement, contract, NDA, lease, policy, judgment)."
+  },
+  {
+    "field": "Document Title",
+    "prompt": "Extract the full title of the document as stated on the first page."
+  },
+  {
+    "field": "Effective Date",
+    "prompt": "Extract the effective date of the agreement. Return in format MM/DD/YYYY."
+  },
+  {
+    "field": "Execution Date",
+    "prompt": "Extract the date on which the document was signed. Return in format MM/DD/YYYY."
+  },
+]
+
+
 
 SOW_TEMPLATE = """
 You are an expert legal and business document data extraction engine specializing in Statements of Work (SOW).
@@ -872,3 +983,32 @@ Before extracting any field:
 
 Return only structured output as instructed separately.
 """
+
+SOW_DATA_POINTS = [
+    {
+        "field": "Project Name",
+        "prompt": "Extract the project name or title as stated in the SOW. Return only the project name string."
+    },
+    {
+        "field": "Client Name",
+        "prompt": "Extract the full legal name of the client/customer as stated in the SOW."
+    },
+    {
+        "field": "Vendor Name",
+        "prompt": "Extract the full legal name of the vendor/service provider as stated in the SOW."
+    },
+    {
+        "field": "Scope of Work",
+        "prompt": "Extract the exact scope of work description from the SOW. Return as a string with exact wording."
+    },
+    {
+        "field": "Start Date",
+        "prompt": "Extract the project start date. Return in format MM/DD/YYYY."
+    },
+    {
+        "field": "End Date",
+        "prompt": "Extract the project end date. Return in format MM/DD/YYYY."
+    }
+]
+
+

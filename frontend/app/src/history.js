@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, Clock } from "lucide-react";
+import { FileText, Clock, Eye, Download, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./history.css";
 
@@ -32,6 +32,29 @@ export function exportToExcel(item) {
 
   const filename = `${(item.pdf_filename || "extraction").replace(/\.pdf$/i, "")}_results.xlsx`;
   XLSX.writeFile(wb, filename);
+}
+
+export function exportAllToExcel(items) {
+  if (!items || items.length === 0) return;
+  const rows = items.map(item => {
+    const results = item.results || {};
+    const dataString = Object.entries(results)
+      .map(([k, v]) => `${k}: ${Array.isArray(v) || typeof v === "object" ? JSON.stringify(v) : v}`)
+      .join("\n");
+    return {
+      "File Name": item.pdf_filename || "Untitled",
+      "Template Name": item.template_name || "N/A",
+      "Date Extracted": item.timestamp ? new Date(item.timestamp).toLocaleString() : "N/A",
+      "Total Fields": item.data_points?.length || 0,
+      "Approved Fields": Object.values(item.results || {}).filter(v => v !== null && v !== undefined).length,
+      "Extracted Values": dataString
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws["!cols"] = [{ wch: 30 }, { wch: 20 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 80 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Dashboard Export");
+  XLSX.writeFile(wb, "dashboard_extractions_report.xlsx");
 }
 
 export function deletePdf(id) {
@@ -277,7 +300,7 @@ export function History() {
                 <th>Date</th>
                 <th>Fields</th>
                 <th>Status</th>
-                <th className="text-right">Actions</th>
+                <th className="text-right actions-header">Actions</th>
               </tr>
             </thead>
             <tbody className="table-body">
@@ -358,25 +381,28 @@ export function History() {
                       </td>
 
                       {/* Actions */}
-                      <td className="cell cell-lg text-right">
+                      <td className="cell cell-lg text-right actions-cell">
                         <div className="actions">
                           <button
                             className="btn primary"
                             onClick={() => setReviewItem(item)}
                           >
-                            👁 Review
+                            <Eye size={13} />
+                            <span>Review</span>
                           </button>
                           <button
                             className="btn secondary"
                             onClick={() => exportToExcel(item)}
                           >
-                            ⬇ Export
+                            <Download size={13} />
+                            <span>Export</span>
                           </button>
                           <button
                             className="btn danger"
                             onClick={() => deletePdf(item.id)}
                           >
-                            Delete
+                            <Trash2 size={13} />
+                            <span>Delete</span>
                           </button>
                         </div>
                       </td>
