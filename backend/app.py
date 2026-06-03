@@ -639,6 +639,8 @@ def save_result_status():
         pdf_filename = data.get("file_name", "")
         result_status = data.get("out", {})
 
+        if not pdf_filename:
+            raise ValueError("file_name is required")
         if not isinstance(result_status, dict):
             raise ValueError("result_status must be a JSON object")
 

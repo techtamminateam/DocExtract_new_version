@@ -6,11 +6,26 @@
   padding: 0;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* smoother rendering */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 /* ── CSS VARIABLES ─────────────────────────────────────────────────────────── */
 :root {
-  --bg:         #ffffff;
-  --surface:    #FAFAFA;
-  --surface2:   #F4F4F5;
+  --bg: #F8FAFC;
+  --surface:    #ffffff;
+  --surface2:   #ffffff;
   --surface3:   #18181B;
   --border:     #E4E4E7;
   --border2:    #D4D4D8;
@@ -39,10 +54,24 @@
 }
 
 .de-surface-2 {
-  background: var(--surface);
+  background: var(--bg);
   width: 100%;
   min-height: 100vh;
   padding: 32px 40px;
+
+  animation: pageFade 0.45s ease;
+}
+
+@keyframes pageFade {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .de-surface-2 header h2 {
@@ -63,9 +92,22 @@
   background-color: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 6px rgba(0, 0, 0, 0.02);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 10px 30px rgba(0, 0, 0, 0.03);
+
   overflow: hidden;
   margin-top: 24px;
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.table-container:hover {
+  box-shadow:
+    0 4px 10px rgba(0,0,0,0.04),
+    0 18px 40px rgba(0,0,0,0.05);
 }
 
 .custom-table {
@@ -110,21 +152,29 @@
 }
 
 .table-row {
-  transition: background-color 0.2s ease;
+  transition:
+    background-color 0.25s ease,
+    transform 0.2s ease;
+
+  background-color: #ffffff;
+
+  opacity: 0;
+  transform: translateY(8px);
+  animation: rowFade 0.35s ease forwards;
 }
 
 .table-row:hover {
-  background-color: rgba(249, 250, 251, 0.7); /* gray-50 with 70% opacity */
+  background-color: rgba(237, 240, 243, 0.7);
+  transform: translateX(4px);
 }
 
-/* Row */
-.table-row {
-  transition: background-color 0.2s ease;
+@keyframes rowFade {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.table-row:hover {
-  background-color: rgba(249, 250, 251, 0.7);
-}
 
 /* Cells */
 .cell {
@@ -150,12 +200,23 @@
 .icon-box {
   width: 32px;
   height: 32px;
-  background-color: #fef2f2; /* red-50 */
+  background-color: #fef2f2;
   border-radius: 8px;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   flex-shrink: 0;
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.table-row:hover .icon-box {
+  transform: scale(1.08) rotate(-3deg);
+  box-shadow: 0 8px 18px rgba(239,68,68,0.12);
 }
 
 .doc-name {
@@ -171,7 +232,6 @@
 /* Badge */
 .badge {
   font-size: 12px;
-  background-color: #f3f4f6;
   color: #4b5563;
   padding: 4px 8px;
   border-radius: 6px;
@@ -208,18 +268,45 @@
 
 /* Progress */
 .progress {
-  height: 4px;
+  height: 6px;
   width: 96px;
   background-color: #f3f4f6;
   border-radius: 999px;
   overflow: hidden;
+  position: relative;
 }
 
 .progress-bar {
   height: 100%;
-  width: 60%; /* dynamic */
-  background-color: #3b82f6;
   border-radius: 999px;
+  transition: width 0.6s ease;
+  position: relative;
+}
+
+/* shimmer effect */
+.progress-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(255,255,255,0.35),
+      transparent
+    );
+
+  animation: shimmer 1.8s infinite;
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(200%);
+  }
 }
 
 /* Status */
@@ -240,12 +327,18 @@
   display: flex;
   justify-content: flex-end;
   gap: 6px;
+
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transform: translateY(4px);
+
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
 }
 
 .table-row:hover .actions {
   opacity: 1;
+  transform: translateY(0);
 }
 
 /* Buttons */
@@ -254,16 +347,31 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+
   font-family: var(--sans);
   font-size: 12px;
   font-weight: 600;
+
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
+
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
   outline: none;
   white-space: nowrap;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+}
+
+.btn:active {
+  transform: scale(0.96);
 }
 
 .btn.primary {
@@ -320,4 +428,403 @@
     width: 16px;
     height: 16px;
     color: var(--cyan);
+}
+
+/* =========================================================
+   RIGHT PANE
+========================================================= */
+
+.dv-fields-pane-v2 {
+  width: 320px;
+  min-width: 320px;
+
+  background: #f8fafc;
+  border-left: 1px solid #e2e8f0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  backdrop-filter: blur(12px);
+
+  animation: paneSlide 0.4s ease;
+}
+
+@keyframes paneSlide {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+/* =========================================================
+   FILE TABS
+========================================================= */
+
+.dv-file-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.dv-file-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.dv-file-tab {
+  min-width: 140px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+
+  border-radius: 12px;
+  padding: 10px;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dv-file-tab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(59,130,246,0.08);
+}
+
+.dv-file-tab.active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.dv-file-tab.failed {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.dv-file-tab-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dv-file-tab-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* =========================================================
+   STATUS DOTS
+========================================================= */
+
+.dv-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.dot-green {
+  background: #22c55e;
+}
+
+.dot-amber {
+  background: #f59e0b;
+}
+
+.dot-gray {
+  background: #94a3b8;
+}
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.dv-pane-header-v2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dv-pane-label-v2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.4px;
+}
+
+.dv-field-count-pill {
+  background: #dbeafe;
+  color: #2563eb;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* =========================================================
+   GRID
+========================================================= */
+
+.dv-fields-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* =========================================================
+   FIELD CARD
+========================================================= */
+
+.dv-field-card-v3 {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+
+  border-radius: 16px;
+  overflow: hidden;
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+
+  opacity: 0;
+  transform: translateY(10px);
+
+  animation: cardFade 0.35s ease forwards;
+}
+
+.dv-field-card-v3:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(15,23,42,0.08);
+}
+
+@keyframes cardFade {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dv-field-card-v3.status-approved {
+  border-color: #86efac;
+}
+
+.dv-field-card-v3.status-flagged {
+  border-color: #fca5a5;
+}
+
+.dv-field-card-v3.status-pending {
+  border-color: #e2e8f0;
+}
+
+/* =========================================================
+   CARD HEADER
+========================================================= */
+
+.dv-card-header-v3 {
+  padding: 14px 14px 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dv-card-num-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dv-card-num {
+  font-size: 10px;
+  color: #94a3b8;
+  font-family: monospace;
+  font-weight: 700;
+}
+
+.dv-card-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+/* =========================================================
+   BADGES
+========================================================= */
+
+.dv-card-badge {
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge-approved {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.badge-flagged {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.badge-extracted {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.badge-pending {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* =========================================================
+   BODY
+========================================================= */
+
+.dv-card-body-v3 {
+  padding: 0 14px 14px;
+}
+
+.dv-card-textarea {
+  width: 100%;
+  border: 1px solid #dbe3ee;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 12px;
+  resize: vertical;
+  min-height: 72px;
+  font-size: 12px;
+  color: #334155;
+  outline: none;
+  transition: 0.2s ease;
+  line-height: 1.5;
+  font-family: var(--mono);
+}
+
+.dv-card-textarea:focus {
+  border-color: #3b82f6;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+}
+
+.dv-card-textarea.null-val {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* =========================================================
+   FLAG NOTE
+========================================================= */
+
+.dv-flag-note-input {
+  width: 100%;
+  border: 1px solid #fecaca;
+  background: #fff7f7;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 11px;
+  outline: none;
+  color: #7f1d1d;
+}
+
+.dv-flag-note-input:focus {
+  border-color: #ef4444;
+  background: #ffffff;
+}
+
+/* =========================================================
+   FOOTER
+========================================================= */
+
+.dv-card-footer-v3 {
+  display: flex;
+  border-top: 1px solid #f1f5f9;
+}
+
+.dv-card-action-btn {
+  flex: 1;
+  border: none;
+  background: #ffffff;
+  padding: 11px;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.dv-card-action-btn:hover {
+  background: #f8fafc;
+}
+
+.dv-card-action-btn.flag {
+  color: #dc2626;
+  border-right: 1px solid #f1f5f9;
+}
+
+.dv-card-action-btn.approve {
+  color: #16a34a;
+}
+
+.dv-card-action-btn.flag.active {
+  background: #fef2f2;
+}
+
+.dv-card-action-btn.approve.active {
+  background: #f0fdf4;
+}
+
+/* =========================================================
+   ADD FIELD BUTTON
+========================================================= */
+
+.dv-add-field-bottom-btn {
+  width: 100%;
+  margin-top: 18px;
+  margin-bottom: 24px;
+  border: 1px dashed #3b82f6;
+  background: #ffffff;
+  color: #2563eb;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.dv-add-field-bottom-btn:hover {
+  background: #eff6ff;
 }

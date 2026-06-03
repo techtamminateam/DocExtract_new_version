@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Play, User, Bell, Shield, KeyRound, CreditCard, Plus, LayoutGrid, Hash, Clock3, Trash2, Activity, DollarSign, ShieldCheck, FileText, Calendar, Users, Type, Wand2, FilePlus2, CheckSquare, Mail, Building2, CalendarDays, MessageSquare, AlertCircle, ChevronDown, ChevronRight, Check, Save, Download, Eye, EyeOff, CheckCircle, AlertTriangle, Info, RefreshCw, Clock } from "lucide-react";
+import {BrainCircuit, Play, User, Bell, Shield, KeyRound, CreditCard, Plus, LayoutGrid, Hash, Clock3, Trash2, Activity, DollarSign, ShieldCheck, FileText, Calendar, Users, Type, Wand2, FilePlus2, CheckSquare, Mail, Building2, CalendarDays, MessageSquare, AlertCircle, ChevronDown, ChevronRight, Check, Save, Download, Eye, EyeOff, CheckCircle, AlertTriangle, Info, RefreshCw, Clock } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./DocExtract.css";
 import { History } from "./history";
@@ -704,7 +704,7 @@ const getTemplateTheme = (name) => {
 
 // ── NEW EXTRACTION UI ──────────────────────────────────────────────────────────
 function NewExtractionUI({
-  file,
+  files,
   dataPoints,
   setDataPoints,
   setPreset,
@@ -738,12 +738,19 @@ function NewExtractionUI({
   verifiedFields,
   editedResult,
   flagNotes,
-  pdfUrl,
+  pdfUrls,
+  activeFileIdx,
+  setActiveFileIdx,
+  activeFileName,
+  resultFileNames,
+  activeFileResult,
+  summary,
   onDragOver,
   onDragLeave,
   onDrop,
   onFileChange,
   clearFile,
+  applyFile,
   addDataPoint,
   handlePresetChange,
   addPreset,
@@ -818,23 +825,27 @@ function NewExtractionUI({
       {/* ══════════════════ VERIFY SCREEN ══════════════════ */}
       {verifyMode && result && (
         <div className="dv-root">
-          {/* Top bar */}
+          {/* ── Top bar ── */}
           <div className="dv-topbar-v2">
             <div className="dv-topbar-left-v2">
               <button className="dv-breadcrumb-link" onClick={backToExtraction}>
-                <ChevronDown size={14} style={{transform: 'rotate(90deg)', marginRight: '4px'}}/> Extractions
+                <ChevronDown size={14} style={{transform:'rotate(90deg)',marginRight:'4px'}}/> Extractions
               </button>
               <ChevronRight size={14} className="dv-breadcrumb-sep" />
               <div className="dv-breadcrumb-current">
-                {file?.name || "medical field.pdf"}
+                {activeFileName || "Review"}
               </div>
               <div className="dv-topbar-stats-v2">
                 <span className="dv-stat-v2 approved">{approvedCount} Approved</span>
                 <span className="dv-stat-v2 flagged">{flaggedCount} Flagged</span>
                 <span className="dv-stat-v2 pending">{pendingCount} Pending</span>
               </div>
+              {summary && (
+                <span className="dv-stat-v2" style={{color:'var(--text-dim)',fontSize:'11px'}}>
+                  {summary.total_files} file{summary.total_files !== 1 ? 's' : ''} · {summary.total_time}s
+                </span>
+              )}
             </div>
-            
             <div className="dv-topbar-actions-v2">
               <button className="dv-approve-all-btn-v2" onClick={approveAll}>
                 <Check size={14} strokeWidth={2.5} /> Approve All
@@ -848,85 +859,151 @@ function NewExtractionUI({
             </div>
           </div>
 
-          {/* Split pane */}
+          {/* ── Body: PDF | file-tabs | fields ── */}
           <div className="dv-split-v2">
+
             {/* LEFT: PDF viewer */}
-            <div className="dv-pdf-pane-v2" style={{ padding: 0, border: 'none' }}>
-              {pdfUrl ? (
+            <div className="dv-pdf-pane-v2" style={{padding:0,border:'none'}}>
+              {pdfUrls[activeFileName] ? (
                 <iframe
                   className="dv-pdf-iframe-v2"
-                  src={pdfUrl}
+                  src={pdfUrls[activeFileName]}
                   title="PDF Viewer"
-                  style={{ width: '100%', height: '100%', border: 'none', borderRadius: '12px' }}
+                  style={{width:'100%',height:'100%',border:'none',borderRadius:'12px'}}
                 />
               ) : (
                 <div className="dv-pdf-fallback">PDF preview unavailable</div>
               )}
             </div>
 
-            {/* RIGHT: Fields panel */}
-            <div className="dv-fields-pane-v2">
-              <div className="dv-pane-header-v2">
-                <div className="dv-pane-label-v2">
-                  <CheckSquare size={16} color="#64748b" /> EXTRACTED FIELDS
+            {/* RIGHT: file tabs + fields panel */}
+            <div className="dv-fields-pane-v2" style={{display:'flex',flexDirection:'column',padding:0,overflow:'hidden'}}>
+
+              {/* File tabs — shown only when >1 file */}
+              {resultFileNames.length > 1 && (
+                <div className="dv-file-tabs">
+                  {resultFileNames.map((fname, fi) => {
+                    const fResult = result[fname];
+                    const fieldKeys = Object.keys(fResult?.extracted_fields || {});
+                    const fApproved = fieldKeys.filter(k => verifiedFields[`${fname}::${k}`] === "approved").length;
+                    const fFlagged  = fieldKeys.filter(k => verifiedFields[`${fname}::${k}`] === "flagged").length;
+                    const fPending  = fieldKeys.filter(k => (verifiedFields[`${fname}::${k}`] || "pending") === "pending").length;
+                    const isFailed  = fResult?.file_status === "failed";
+                    return (
+                      <button
+                        key={fname}
+                        className={`dv-file-tab${fi === activeFileIdx ? " active" : ""}${isFailed ? " failed" : ""}`}
+                        onClick={() => setActiveFileIdx(fi)}
+                        title={fname}
+                      >
+                        <span className="dv-file-tab-name">{fname}</span>
+                        <span className="dv-file-tab-meta">
+                          {isFailed
+                            ? <span style={{color:'#f87171',fontSize:'10px'}}>Failed</span>
+                            : <>
+                                <span style={{fontSize:'10px',color:'var(--text-dim)'}}>{fieldKeys.length} fields</span>
+                                {fApproved > 0 && <span className="dv-dot dot-green" title={`${fApproved} approved`}/>}
+                                {fFlagged  > 0 && <span className="dv-dot dot-amber" title={`${fFlagged} flagged`}/>}
+                                {fPending  > 0 && <span className="dv-dot dot-gray"  title={`${fPending} pending`}/>}
+                              </>
+                          }
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-                <span className="dv-field-count-pill">{verifyEntries.length} FIELDS</span>
-              </div>
-              <div className="dv-fields-list-v2">
-                {verifyEntries.map(([key, val], idx) => {
-                  const status = verifiedFields[key] || "pending";
-                  const isFlagged = status === "flagged";
-                  return (
-                    <div key={key} className={`dv-field-card-v2 status-${status}`}>
-                      <div className="dv-field-card-top-v2">
-                        <div className="dv-field-left-v2">
-                          <span className="dv-field-idx-v2">{String(idx + 1).padStart(2, "0")}</span>
-                          <span className="dv-field-key-v2">{key}</span>
-                        </div>
-                        <div className="dv-field-actions-v2">
-                          <span className={`dv-status-badge-v2 badge-${status}`}>
-                            {status === "approved" ? "Approved" : status === "flagged" ? "Flagged" : "Pending"}
+              )}
+
+              {/* Fields scroll area */}
+              <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
+                {/* Panel header */}
+                <div className="dv-pane-header-v2" style={{marginBottom:'14px'}}>
+                  <div className="dv-pane-label-v2">
+                    <CheckSquare size={16} color="#64748b"/> EXTRACTED FIELDS
+                  </div>
+                  <span className="dv-field-count-pill">{verifyEntries.length} FIELDS</span>
+                </div>
+
+                {/* Failed file banner */}
+                {result[activeFileName]?.file_status === "failed" && (
+                  <div style={{
+                    background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',
+                    borderRadius:'10px',padding:'14px 16px',color:'#f87171',fontSize:'13px',marginBottom:'16px'
+                  }}>
+                    ⚠ Extraction failed for this file: {result[activeFileName]?.error || "Unknown error"}
+                  </div>
+                )}
+
+                {/* Field cards */}
+                <div className="dv-fields-cards-grid">
+                  {verifyEntries.map(([sk, val], idx) => {
+                    // sk = "filename::fieldName"
+                    const fieldName = sk.split("::").slice(1).join("::");
+                    const status    = verifiedFields[sk] || "pending";
+                    const isNull    = val === "" && (result[activeFileName]?.extracted_fields?.[fieldName] == null);
+                    const isFlagged = status === "flagged";
+                    return (
+                      <div key={sk} className={`dv-field-card-v3 status-${status}`}>
+                        {/* Card header */}
+                        <div className="dv-card-header-v3">
+                          <div className="dv-card-num-label">
+                            <span className="dv-card-num">{String(idx + 1).padStart(2, "0")}</span>
+                            <span className="dv-card-label">{fieldName}</span>
+                          </div>
+                          <span className={`dv-card-badge badge-${status === "pending" && !isNull ? "extracted" : status}`}>
+                            {status === "approved" && "✓ Approved"}
+                            {status === "flagged"  && "⚑ Flagged"}
+                            {status === "pending"  && !isNull && "✓ Extracted"}
+                            {status === "pending"  && isNull  && "— Not Found"}
                           </span>
+                        </div>
+
+                        {/* Editable value */}
+                        <div className="dv-card-body-v3">
+                          <textarea
+                            className={`dv-card-textarea${isNull && !val ? " null-val" : ""}`}
+                            value={val}
+                            onChange={(e) => setFieldValue(sk, e.target.value)}
+                            rows={Math.min(5, Math.max(2, (val || "").split("\n").length + 1))}
+                            placeholder={isNull ? "No value found in document" : ""}
+                          />
+                          {isFlagged && (
+                            <input
+                              className="dv-flag-note-input"
+                              placeholder="Add a note about this issue…"
+                              value={flagNotes[sk] || ""}
+                              onChange={(e) => setFieldNote(sk, e.target.value)}
+                              style={{marginTop:'8px'}}
+                            />
+                          )}
+                        </div>
+
+                        {/* Approve / Flag actions */}
+                        <div className="dv-card-footer-v3">
                           <button
-                            className={`dv-btn-approve-v2 ${status === "approved" ? "active" : ""}`}
-                            onClick={() => setFieldStatus(key, status === "approved" ? "pending" : "approved")}
-                            title="Approve"
-                          >
-                            <Check size={12} strokeWidth={3} />
-                          </button>
-                          <button
-                            className={`dv-btn-flag-v2 ${status === "flagged" ? "active" : ""}`}
-                            onClick={() => setFieldStatus(key, status === "flagged" ? "pending" : "flagged")}
-                            title="Flag for review"
+                            className={`dv-card-action-btn flag${isFlagged ? " active" : ""}`}
+                            onClick={() => setFieldStatus(sk, isFlagged ? "pending" : "flagged")}
                           >
                             <svg viewBox="0 0 24 24" fill="currentColor" width="10" height="10">
-                              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1v19h2v-7z" />
+                              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1v19h2v-7z"/>
                             </svg>
+                            {isFlagged ? "Unflag" : "Flag"}
+                          </button>
+                          <button
+                            className={`dv-card-action-btn approve${status === "approved" ? " active" : ""}`}
+                            onClick={() => setFieldStatus(sk, status === "approved" ? "pending" : "approved")}
+                          >
+                            <Check size={11} strokeWidth={3}/>
+                            {status === "approved" ? "Approved" : "Approve"}
                           </button>
                         </div>
                       </div>
-                      <textarea
-                        className="dv-field-value-v2"
-                        value={editedResult[key] ?? ""}
-                        onChange={(e) => setFieldValue(key, e.target.value)}
-                        rows={Math.min(6, Math.max(2, (editedResult[key] || "").split("\n").length + 1))}
-                        placeholder="null"
-                      />
-                      {isFlagged && (
-                        <div className="dv-flag-note-wrap-v2">
-                          <input
-                            className="dv-flag-note-input"
-                            placeholder="Add a note about this issue…"
-                            value={flagNotes[key] || ""}
-                            onChange={(e) => setFieldNote(key, e.target.value)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+
                 <button className="dv-add-field-bottom-btn" onClick={backToExtraction}>
-                  <Plus size={14} strokeWidth={2.5} /> Add Field
+                  <Plus size={14} strokeWidth={2.5}/> Add Field
                 </button>
               </div>
             </div>
@@ -970,9 +1047,10 @@ function NewExtractionUI({
               >
                 <input 
                   type="file" 
-                  accept=".pdf" 
+                  accept="application/pdf"
+                  multiple   
                   ref={fileInputRef} 
-                  onChange={onFileChange} 
+                  onChange={onFileChange}
                   style={{ display: 'none' }} 
                   onClick={(e) => e.stopPropagation()} 
                 />
@@ -984,22 +1062,27 @@ function NewExtractionUI({
                     />
                   </svg>
                 </div>
-                <div className="de-up-title">Drop your PDF here or click to browse</div>
+                <div className="de-up-title">Drop PDFs here or click to browse</div>
                 <div className="de-up-sub">
-                  Accepts <b>.pdf</b> files
+                  Accepts <b>.pdf</b> files · multiple files supported
                 </div>
 
-                <div className={`de-file-info${file ? " show" : ""}`}>
-                  <svg className="de-file-info-font" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                  <span className="de-file-info-font">{file?.name}</span>
-                  <span style={{ color: "var(--text-dim)" }}>
-                    {file ? `(${(file.size / 1024 / 1024).toFixed(2)} MB)` : ""}
-                  </span>
-                  <span className="rm" onClick={(e) => { e.stopPropagation(); clearFile(); }}>✕</span>
-                </div>
+                {/* Multi-file list */}
+                {files.length > 0 && (
+                  <div className="de-multi-file-list" onClick={(e) => e.stopPropagation()}>
+                    {files.map((f) => (
+                      <div key={f.name} className="de-multi-file-item">
+                        <svg className="de-file-info-font" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                        <span className="de-file-info-font">{f.name}</span>
+                        <span style={{color:"var(--text-dim)",fontSize:"11px"}}>({(f.size/1024/1024).toFixed(2)} MB)</span>
+                        <span className="rm" onClick={() => clearFile(f.name)}>✕</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1010,24 +1093,28 @@ function NewExtractionUI({
                     <path d="M4 7.5A3.5 3.5 0 017.5 4H10l2 2h4.5A3.5 3.5 0 0120 9.5v7A3.5 3.5 0 0116.5 20h-9A3.5 3.5 0 014 16.5v-9z" stroke="currentColor" />
                   </svg>
                 </div>
-                <div className="de-up-title">Select a PDF from Google Drive</div>
+                <div className="de-up-title">Select PDFs from Google Drive</div>
                 <div className="de-up-sub">
                   Click to browse your Drive files
                 </div>
                 <button className="de-drive-btn" type="button" onClick={(e) => { e.stopPropagation(); openDrivePicker(); }}>
                   Browse Drive files
                 </button>
-                <div className={`de-file-info${file ? " show" : ""}`}>
-                  <svg className="de-file-info-font" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                  <span className="de-file-info-font">{file?.name}</span>
-                  <span style={{ color: "var(--text-dim)" }}>
-                    {file ? `(${(file.size / 1024 / 1024).toFixed(2)} MB)` : ""}
-                  </span>
-                  <span className="rm" onClick={(e) => { e.stopPropagation(); clearFile(); }}>✕</span>
-                </div>
+                {files.length > 0 && (
+                  <div className="de-multi-file-list" onClick={(e) => e.stopPropagation()}>
+                    {files.map((f) => (
+                      <div key={f.name} className="de-multi-file-item">
+                        <svg className="de-file-info-font" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                          <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        <span className="de-file-info-font">{f.name}</span>
+                        <span style={{color:"var(--text-dim)",fontSize:"11px"}}>({(f.size/1024/1024).toFixed(2)} MB)</span>
+                        <span className="rm" onClick={() => clearFile(f.name)}>✕</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1038,24 +1125,28 @@ function NewExtractionUI({
                     <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" stroke="currentColor" />
                   </svg>
                 </div>
-                <div className="de-up-title">Select a PDF from Microsoft OneDrive</div>
+                <div className="de-up-title">Select PDFs from Microsoft OneDrive</div>
                 <div className="de-up-sub">
                   Click to browse your OneDrive files
                 </div>
                 <button className="de-drive-btn" type="button" onClick={(e) => { e.stopPropagation(); openOneDrivePicker(); }}>
                   Browse OneDrive files
                 </button>
-                <div className={`de-file-info${file ? " show" : ""}`}>
-                  <svg className="de-file-info-font" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                  <span className="de-file-info-font">{file?.name}</span>
-                  <span style={{ color: "var(--text-dim)" }}>
-                    {file ? `(${(file.size / 1024 / 1024).toFixed(2)} MB)` : ""}
-                  </span>
-                  <span className="rm" onClick={(e) => { e.stopPropagation(); clearFile(); }}>✕</span>
-                </div>
+                {files.length > 0 && (
+                  <div className="de-multi-file-list" onClick={(e) => e.stopPropagation()}>
+                    {files.map((f) => (
+                      <div key={f.name} className="de-multi-file-item">
+                        <svg className="de-file-info-font" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                          <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        <span className="de-file-info-font">{f.name}</span>
+                        <span style={{color:"var(--text-dim)",fontSize:"11px"}}>({(f.size/1024/1024).toFixed(2)} MB)</span>
+                        <span className="rm" onClick={() => clearFile(f.name)}>✕</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1126,7 +1217,7 @@ function NewExtractionUI({
                 </div>
                 <div className="de-dp-add-row">
                   <div className="de-input-wrapper">
-                    <span className="de-input-icon" style={{ backgroundColor: '#f3e8ff', color: '#a855f7' }}>
+                    <span className="de-input-icon" style={{ backgroundColor: '#c4d0e2', color: '#265cb3' }}>
                       <Type size={14} strokeWidth={2.5} />
                     </span>
                     <input
@@ -1141,7 +1232,7 @@ function NewExtractionUI({
                   </div>
                   
                   <div className="de-input-wrapper flex-1">
-                    <span className="de-input-icon" style={{ backgroundColor: '#f3e8ff', color: '#a855f7' }}>
+                    <span className="de-input-icon" style={{ backgroundColor: '#c4d0e2', color: '#265cb3' }}>
                       <Wand2 size={14} strokeWidth={2.5} />
                     </span>
                     <textarea
@@ -1286,14 +1377,15 @@ function NewExtractionUI({
             <div className="de-run-bar">
               <div className="de-run-info">
                 <div>
-                  PDF: <span className="rv">{file ? file.name : "—"}</span>
+                  PDFs: <span className="rv">
+                    {files.length === 0 ? "—" : files.length === 1 ? files[0].name : `${files.length} files selected`}
+                  </span>
                 </div>
                 <div>
                   Fields: <span className="rv">{dataPoints.length}</span>
                   &nbsp;·&nbsp; Backend: <span className="rv">localhost:5000</span>
                 </div>
               </div>
-
             </div>
 
             {/* ── PROGRESS ── */}
@@ -1312,32 +1404,50 @@ function NewExtractionUI({
                   <div className="de-res-dot" />
                   <span className="de-res-title">Extraction Results</span>
                   <span className="de-res-count">{resultEntries.length} fields</span>
+                  {resultFileNames.length > 1 && (
+                    <span style={{fontSize:'11px',color:'var(--text-dim)',fontFamily:'var(--font-mono)'}}>
+                      · {resultFileNames.length} files
+                    </span>
+                  )}
                 </div>
                 <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
                   <div className="de-vtoggle">
-                    <button
-                      className={`de-vt${view === "table" ? " active" : ""}`}
-                      onClick={() => setView("table")}
-                    >
-                      Table
-                    </button>
-                    <button
-                      className={`de-vt${view === "json" ? " active" : ""}`}
-                      onClick={() => setView("json")}
-                    >
-                      JSON
-                    </button>
+                    <button className={`de-vt${view === "table" ? " active" : ""}`} onClick={() => setView("table")}>Table</button>
+                    <button className={`de-vt${view === "json"  ? " active" : ""}`} onClick={() => setView("json")}>JSON</button>
                   </div>
                   <div className="de-res-acts">
-                    <button className="de-act-btn" onClick={() => setVerifyMode(true)}>
-                      ↗ Review with PDF
-                    </button>
-                    <button className="de-act-btn" onClick={downloadExcel}>
-                      ↓ Download Excel
-                    </button>
+                    <button className="de-act-btn" onClick={() => setVerifyMode(true)}>↗ Review with PDF</button>
+                    <button className="de-act-btn" onClick={downloadExcel}>↓ Download Excel</button>
                   </div>
                 </div>
               </div>
+
+              {/* Per-file tab strip when >1 file */}
+              {resultFileNames.length > 1 && (
+                <div className="de-result-file-tabs">
+                  {resultFileNames.map((fname, fi) => {
+                    const fStatus = result[fname]?.file_status;
+                    return (
+                      <button
+                        key={fname}
+                        className={`de-result-file-tab${fi === activeFileIdx ? " active" : ""}${fStatus === "failed" ? " failed" : ""}`}
+                        onClick={() => setActiveFileIdx(fi)}
+                        title={fname}
+                      >
+                        {fname}
+                        {fStatus === "failed" && <span style={{marginLeft:'4px',color:'#f87171'}}>✕</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Failed file message */}
+              {result && activeFileResult?.file_status === "failed" && (
+                <div style={{padding:'16px',color:'#f87171',fontSize:'13px',background:'rgba(248,113,113,0.06)',borderRadius:'8px',margin:'12px 0'}}>
+                  ⚠ Extraction failed for <b>{activeFileName}</b>: {activeFileResult?.error || "Unknown error"}
+                </div>
+              )}
 
               {/* Table view */}
               {view === "table" && (
@@ -1541,13 +1651,16 @@ function NewExtractionUI({
 }
 
 function SettingsPage({ activeTab, setActiveTab, notifications, setNotifications }) {
-  const [userEmail, setUserEmail] = useState("alex.johnson@company.com");
+  const [userEmail, setUserEmail] = useState("");
   const [newEmailInput, setNewEmailInput] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpDigits, setOtpDigits] = useState(["", "", "", "", "", ""]);
   const [generatedOtp, setGeneratedOtp] = useState("");
   const [emailError, setEmailError] = useState("");
   const [emailSuccess, setEmailSuccess] = useState("");
+  useEffect(() => {
+    setUserEmail(localStorage.getItem("email") || "");
+  }, []);
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState("");
@@ -1619,7 +1732,7 @@ function SettingsPage({ activeTab, setActiveTab, notifications, setNotifications
     }
 
     // Successfully updated (mock)
-    const response = await fetch(`${BACKEND_URL}/change_password`, {
+const response = await fetch(`${BACKEND_URL}/change_password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1635,9 +1748,11 @@ function SettingsPage({ activeTab, setActiveTab, notifications, setNotifications
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setPasswordSuccess("Password updated successfully.");
+      let message = await response.json();
+      setPasswordSuccess(message.message);
     } else {
-      setPasswordError("Failed to update password. Please try again.");
+      let error = await response.json();
+      setPasswordError(error.message);
       }
   };
 
@@ -1678,7 +1793,7 @@ function SettingsPage({ activeTab, setActiveTab, notifications, setNotifications
     }
   };
 
-  const handleSendOtp = () => {
+  const handleSendOtp = async () => {
     setEmailError("");
     setEmailSuccess("");
     
@@ -1698,15 +1813,27 @@ function SettingsPage({ activeTab, setActiveTab, notifications, setNotifications
       return;
     }
     
-    // Generate code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(code);
+    const response = await fetch(`${BACKEND_URL}/send_otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        "user_id": localStorage.getItem("id"),
+        "email": userEmail.toLowerCase(),
+      }),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      setEmailSuccess(data.message);
+    } else {
+      const errorData = await response.json();
+      setEmailError(errorData.error || "Failed to send verification code. Please try again.");
+    };
     setOtpSent(true);
-    setOtpDigits(["", "", "", "", "", ""]);
-    setEmailSuccess(`A 6-digit verification code has been sent to ${newEmailInput}.`);
   };
 
-  const handleVerifyOtp = () => {
+  const handleVerifyOtp = async () => {
     setEmailError("");
     setEmailSuccess("");
     const enteredOtp = otpDigits.join("");
@@ -1716,16 +1843,28 @@ function SettingsPage({ activeTab, setActiveTab, notifications, setNotifications
       return;
     }
     
-    if (enteredOtp === generatedOtp) {
+    const response = await fetch(`${BACKEND_URL}/verify_otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        "user_id": localStorage.getItem("id"),
+        "email": userEmail.toLowerCase(),
+        "new_email": newEmailInput.toLowerCase(),
+        "otp": enteredOtp,
+      }),
+    });
+    if (response.ok) {
+      const data = await response.json();
       setUserEmail(newEmailInput.toLowerCase());
-      setNewEmailInput("");
-      setOtpSent(false);
-      setGeneratedOtp("");
-      setOtpDigits(["", "", "", "", "", ""]);
-      setEmailSuccess("Your account email address has been successfully updated.");
+      localStorage.setItem("email", newEmailInput.toLowerCase());
+      setEmailSuccess(data.message);
     } else {
-      setEmailError("Invalid verification code. Please check and try again.");
+      const errorData = await response.json();
+      setEmailError(errorData.error || "Invalid verification code. Please try again.");
     }
+    
   };
 
   const handleCancelEmailChange = () => {
@@ -2432,18 +2571,8 @@ function SettingsPage({ activeTab, setActiveTab, notifications, setNotifications
                   </div>
                 ) : (
                   <div className="email-settings-field" style={{ animation: 'fadeIn 0.3s ease' }}>
-                    <div className="email-status-banner info" style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
-                        <Activity size={14} strokeWidth={2.5} />
-                        <span>Mock Email Delivery Service</span>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '12px', color: '#1e40af', opacity: 0.9 }}>
-                        For testing purposes, please enter the following verification code: <strong style={{ fontSize: '14px', textDecoration: 'underline' }}>{generatedOtp}</strong>
-                      </p>
-                    </div>
-
                     <label style={{ textAlign: 'center', display: 'block', marginBottom: '8px' }}>
-                      Enter the 6-digit verification code sent to <strong>{newEmailInput}</strong>
+                      Enter the 6-digit verification code sent to <strong>{userEmail}</strong>
                     </label>
 
                     <div className="otp-inputs-row">
@@ -3093,16 +3222,6 @@ function TemplatesPage({ onUseTemplate }) {
                     </span>
                     <div className="template-card-top-actions">
                       <button
-                        className="template-card-edit-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setInitialTab("datapoints");
-                          setSelectedTemplateId(template.id);
-                        }}
-                      >
-                        + Data Points
-                      </button>
-                      <button
                         className="template-card-use-btn"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -3154,7 +3273,7 @@ function TemplatesPage({ onUseTemplate }) {
 // ── COMPONENT ─────────────────────────────────────────────────────────────────
 export default function DocExtract({ onLogout }) {
   // State
-  const [file, setFileState] = useState(null);
+  const [files, setFiles] = useState([]);           // multi-file array
   const [dataPoints, setDataPoints] = useState([]);
   const [newField, setNewField] = useState("");
   const [newPrompt, setNewPrompt] = useState("");
@@ -3209,7 +3328,7 @@ export default function DocExtract({ onLogout }) {
   const [verifiedFields, setVerifiedFields] = useState({}); // { fieldKey: "approved"|"flagged"|"pending" }
   const [editedResult, setEditedResult] = useState({});     // { fieldKey: editedValue }
   const [flagNotes, setFlagNotes] = useState({});           // { fieldKey: noteString }
-  const [pdfUrl, setPdfUrl] = useState(null);
+  const [pdfUrls, setPdfUrls] = useState({});       // { filename: blobUrl }
   const [uploadSource, setUploadSource] = useState("local");
   const [driveModalOpen, setDriveModalOpen] = useState(false);
   const [driveFiles, setDriveFiles] = useState([]);
@@ -3226,6 +3345,8 @@ export default function DocExtract({ onLogout }) {
   const [oneDriveSearch, setOneDriveSearch] = useState("");
   const [oneDriveSelectingId, setOneDriveSelectingId] = useState(null);
   const [oneDriveConnected, setOneDriveConnected] = useState(false);
+  const [activeFileIdx, setActiveFileIdx] = useState(0);
+  const [summary, setSummary] = useState(null);
 
   useEffect(() => {
     // Clear results when file or data points change
@@ -3239,13 +3360,15 @@ export default function DocExtract({ onLogout }) {
   const withPrompts = dataPoints.filter((d) => d.prompt.trim()).length;
   const missingCount = dataPoints.length - withPrompts;
   const canRun =
-    file &&
+    files.length > 0 &&
     dataPoints.length > 0 &&
     dataPoints.every((d) => d.field.trim() && d.prompt.trim());
 
   // ── File Handling ──────────────────────────────────────────────────────────
   const applyFile = useCallback((f) => {
-    if (f && f.type === "application/pdf") setFileState(f);
+    if (f && f.type === "application/pdf") {
+      setFiles(prev => prev.find(x => x.name === f.name) ? prev : [...prev, f]);
+    }
   }, []);
 
   const switchUploadSource = (source) => {
@@ -3264,15 +3387,20 @@ export default function DocExtract({ onLogout }) {
     }
   };
 
-  const clearFile = () => {
-    setFileState(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  // clearFile(name) removes one file by name; clearFile() clears all
+  const clearFile = (name) => {
+    if (name) {
+      setFiles(prev => prev.filter(f => f.name !== name));
+    } else {
+      setFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const onDragOver = (e) => { e.preventDefault(); setDragging(true); };
   const onDragLeave = () => setDragging(false);
-  const onDrop = (e) => { e.preventDefault(); setDragging(false); applyFile(e.dataTransfer.files[0]); };
-  const onFileChange = (e) => { if (e.target.files[0]) applyFile(e.target.files[0]); };
+  const onDrop = (e) => { e.preventDefault(); setDragging(false); Array.from(e.dataTransfer.files).forEach(applyFile); };
+  const onFileChange = (e) => { Array.from(e.target.files || []).forEach(applyFile); };
 
   const fetchDriveFiles = async () => {
     setDriveLoading(true);
@@ -3509,6 +3637,10 @@ export default function DocExtract({ onLogout }) {
 
   // ── Extraction ─────────────────────────────────────────────────────────────
   const runExtraction = async () => {
+    if (files.length === 0) {
+      setError("Please upload at least one PDF file.");
+      return;
+    }
     const missing = dataPoints.filter((d) => !d.prompt.trim());
     if (missing.length > 0) {
       setError(
@@ -3519,16 +3651,16 @@ export default function DocExtract({ onLogout }) {
 
     setError("");
     setLoading(true);
-    setProg({ show: true, pct: 8, msg: "Uploading PDF…" });
+    setProg({ show: true, pct: 8, msg: `Uploading ${files.length} PDF${files.length > 1 ? "s" : ""}…` });
 
     const payload = dataPoints.map((d) => ({ field: d.field.trim(), prompt: d.prompt.trim() }));
     const fd = new FormData();
-    fd.append("pdf", file);
+    files.forEach(f => fd.append("pdf", f));   // ← all files under key "pdf"
     fd.append("data_points", JSON.stringify(payload));
     fd.append("preset", preset);
 
     try {
-      setProg({ show: true, pct: 25, msg: "Extracting text from PDF (OCR if needed)…" });
+      setProg({ show: true, pct: 25, msg: `Extracting text from ${files.length} PDF${files.length > 1 ? "s" : ""} (OCR if needed)…` });
 
       let resp;
       try {
@@ -3537,7 +3669,7 @@ export default function DocExtract({ onLogout }) {
         throw new Error(`Network error: ${fetchErr.message}. Is the backend running on localhost:5000?`);
       }
 
-      setProg({ show: true, pct: 70, msg: `Running per-field AI extraction (${payload.length} fields)…` });
+      setProg({ show: true, pct: 70, msg: `Running AI extraction — ${payload.length} fields × ${files.length} file(s)…` });
 
       let data;
       try {
@@ -3548,25 +3680,35 @@ export default function DocExtract({ onLogout }) {
 
       if (!resp.ok) throw new Error(data.error || `Server error ${resp.status}`);
       if (data.error) throw new Error(data.error);
-      if (!data.data) throw new Error("Invalid response: no data field returned from server");
+      if (!data.results) throw new Error("Invalid response: no results returned from server");
 
       setProg({ show: true, pct: 100, msg: "Rendering results…" });
-      setResult(data.data);
-      // ── Init verify state ──
-      const initEdited = {};
-      const initVerified = {};
-      Object.entries(data.data).forEach(([k, v]) => {
-        initEdited[k] = v === null || v === undefined ? "null" : typeof v === "object" ? JSON.stringify(v, null, 2) : String(v);
-        initVerified[k] = "pending";
+
+      // data.results = { "filename.pdf": { extracted_fields: {...}, file_status, processing_time }, ... }
+      setResult(data.results);
+      setSummary(data.summary);
+      setActiveFileIdx(0);
+
+      // Init verify state — key: "filename::fieldName"
+      const initEdited = {}, initVerified = {};
+      Object.entries(data.results).forEach(([filename, fileResult]) => {
+        if (fileResult.file_status === "success") {
+          Object.entries(fileResult.extracted_fields || {}).forEach(([key, val]) => {
+            const sk = `${filename}::${key}`;
+            initEdited[sk] = val == null ? "" : typeof val === "object" ? JSON.stringify(val, null, 2) : String(val);
+            initVerified[sk] = "pending";
+          });
+        }
       });
       setEditedResult(initEdited);
       setVerifiedFields(initVerified);
       setFlagNotes({});
-      // Build a blob URL for the PDF viewer
-      if (file) {
-        const url = URL.createObjectURL(file);
-        setPdfUrl(url);
-      }
+
+      // Build blob URLs for every uploaded file
+      const urls = {};
+      files.forEach(f => { urls[f.name] = URL.createObjectURL(f); });
+      setPdfUrls(urls);
+
       setTimeout(() => setProg({ show: false, pct: 0, msg: "" }), 500);
       setTimeout(() => setVerifyMode(true), 600);
     } catch (err) {
@@ -3587,17 +3729,21 @@ export default function DocExtract({ onLogout }) {
 
   const downloadExcel = () => {
     if (!result) return;
-    const wsData = [["Field", "Value"]];
-    Object.entries(result).forEach(([k, v]) => {
-      const cellValue = v === null || v === undefined ? "null" : typeof v === "object" ? JSON.stringify(v) : String(v);
-      wsData.push([k, cellValue]);
-    });
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    ws["!cols"] = [{ wch: 25 }, { wch: 50 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Results");
-    const filename = (file?.name?.replace(".pdf", "") || "result") + "_result.xlsx";
-    XLSX.writeFile(wb, filename);
+    Object.entries(result).forEach(([filename, fileResult]) => {
+      if (fileResult.file_status !== "success") return;
+      const wsData = [["Field", "Value"]];
+      Object.entries(fileResult.extracted_fields || {}).forEach(([k, v]) => {
+        const cellValue = v == null ? "null" : typeof v === "object" ? JSON.stringify(v) : String(v);
+        wsData.push([k, cellValue]);
+      });
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws["!cols"] = [{ wch: 25 }, { wch: 50 }];
+      // Sheet name max 31 chars
+      const sheetName = filename.replace(/\.pdf$/i, "").substring(0, 31);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    });
+    XLSX.writeFile(wb, "extraction_results.xlsx");
   };
 
   // ── Verify helpers ─────────────────────────────────────────────────────────
@@ -3610,55 +3756,80 @@ export default function DocExtract({ onLogout }) {
   const setFieldNote = (key, note) =>
     setFlagNotes((prev) => ({ ...prev, [key]: note }));
 
-  const approveAll = () =>
-    setVerifiedFields((prev) => Object.fromEntries(Object.keys(prev).map((k) => [k, "approved"])));
+  const approveAll = () => {
+    // Approve only the currently active file's fields
+    if (!result) return;
+    const activeFileName = Object.keys(result)[activeFileIdx];
+    if (!activeFileName) return;
+    const fields = Object.keys(result[activeFileName]?.extracted_fields || {});
+    setVerifiedFields(prev => {
+      const next = { ...prev };
+      fields.forEach(key => { next[`${activeFileName}::${key}`] = "approved"; });
+      return next;
+    });
+  };
+
   const saveJson = async () => {
     try {
-      const out = {};
+      if (!activeFileName || !activeFileResult) {
+        throw new Error("No active file selected for saving.");
+      }
 
-      Object.keys(editedResult).forEach((k) => {
-        out[k] = {
-          value: editedResult[k],
-          status: verifiedFields[k] || "pending",
-          note: flagNotes[k] || "",
+      if (activeFileResult.file_status !== "success") {
+        throw new Error("Only successful extractions can be saved.");
+      }
+
+      const out = {};
+      Object.keys(activeFileResult.extracted_fields || {}).forEach((key) => {
+        const sk = `${activeFileName}::${key}`;
+        out[key] = {
+          value: editedResult[sk] ?? "",
+          status: verifiedFields[sk] || "pending",
+          note: flagNotes[sk] || "",
         };
       });
-
-      const payload = {
-        file_name: file?.name || "",
-        out: out,
-      };
 
       const res = await fetch("http://localhost:5000/api/save_result_status", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          file_name: activeFileName,
+          out,
+        }),
       });
-
-      if (res.ok) {
-        const result = await res.json();
-        alert(result.message || "Results saved successfully to server.");
-      }
 
       if (!res.ok) {
         throw new Error(`Server error ${res.status}`);
       }
+
+      const r = await res.json();
+      alert(r.message || "Results saved successfully.");
     } catch (err) {
       console.error(err);
-      alert("Failed to save results to server: " + err.message);
+      alert("Failed to save results: " + err.message);
     }
   };
 
   const exportVerified = () => {
+    if (!result) return;
     const out = {};
-    Object.keys(editedResult).forEach((k) => {
-      out[k] = { value: editedResult[k], status: verifiedFields[k] || "pending", note: flagNotes[k] || "" };
+    Object.entries(result).forEach(([filename, fileResult]) => {
+      if (fileResult.file_status !== "success") return;
+      out[filename] = {};
+      Object.keys(fileResult.extracted_fields || {}).forEach(key => {
+        const sk = `${filename}::${key}`;
+        out[filename][key] = {
+          value: editedResult[sk] ?? "",
+          status: verifiedFields[sk] || "pending",
+          note: flagNotes[sk] || "",
+        };
+      });
     });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: "application/json" }));
-    a.download = (file?.name?.replace(".pdf", "") || "result") + "_verified.json";
+    a.download = "extraction_verified.json";
     a.click();
   };
 
@@ -3667,14 +3838,26 @@ export default function DocExtract({ onLogout }) {
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  const resultEntries = result ? Object.entries(result) : [];
-  const resultFilename = file ? file.name.replace(".pdf", "") + "_result.json" : "result.json";
+  // Active-file context for verify/results panels
+  const resultFileNames = result ? Object.keys(result) : [];
+  const activeFileName = resultFileNames[activeFileIdx] || "";
+  const activeFileResult = result ? result[activeFileName] : null;
+  const activeExtractedFields = activeFileResult?.extracted_fields || {};
 
-  // ── Verify screen derived ──────────────────────────────────────────────────
-  const verifyEntries = result ? Object.entries(editedResult) : [];
+  // For the old results section (table/json view) — show active file
+  const resultEntries = Object.entries(activeExtractedFields);
+  const resultFilename = activeFileName ? activeFileName.replace(/\.pdf$/i, "") + "_result.json" : "result.json";
+
+  // For the verify screen — per active file, using scoped keys "filename::fieldName"
+  const verifyEntries = Object.entries(activeExtractedFields).map(([key]) => {
+    const sk = `${activeFileName}::${key}`;
+    return [sk, editedResult[sk] ?? ""];
+  });
+
+  // Global counts across all files
   const approvedCount = Object.values(verifiedFields).filter((s) => s === "approved").length;
-  const flaggedCount = Object.values(verifiedFields).filter((s) => s === "flagged").length;
-  const pendingCount = Object.values(verifiedFields).filter((s) => s === "pending").length;
+  const flaggedCount  = Object.values(verifiedFields).filter((s) => s === "flagged").length;
+  const pendingCount  = Object.values(verifiedFields).filter((s) => s === "pending").length;
 
   const navItems = [
     {
@@ -3739,10 +3922,7 @@ export default function DocExtract({ onLogout }) {
             {!sidebarCollapsed && (
               <div className="de-sb-logo-inner">
                 <div className="de-sb-logo-box">
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5" stroke="white" width="18" height="18">
-                    <path d="M9 12h6M9 16h6M7 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2h-2" />
-                    <path d="M9 4h6a2 2 0 010 4H9a2 2 0 010-4z" />
-                  </svg>
+                  <BrainCircuit size={20} />
                 </div>
                 <span className="de-sb-brand">Doc<span>Extract</span></span>
               </div>
@@ -3831,7 +4011,7 @@ export default function DocExtract({ onLogout }) {
         {/* Conditional rendering based on activeNav */}
         {activeNav === "extraction" && (
           <NewExtractionUI
-            file={file}
+            files={files}
             dataPoints={dataPoints}
             setDataPoints={setDataPoints}
             setPreset={setPreset}
@@ -3865,12 +4045,19 @@ export default function DocExtract({ onLogout }) {
             verifiedFields={verifiedFields}
             editedResult={editedResult}
             flagNotes={flagNotes}
-            pdfUrl={pdfUrl}
+            pdfUrls={pdfUrls}
+            activeFileIdx={activeFileIdx}
+            setActiveFileIdx={setActiveFileIdx}
+            activeFileName={activeFileName}
+            resultFileNames={resultFileNames}
+            activeFileResult={activeFileResult}
+            summary={summary}
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
             onDrop={onDrop}
             onFileChange={onFileChange}
             clearFile={clearFile}
+            applyFile={applyFile}
             addDataPoint={addDataPoint}
             handlePresetChange={handlePresetChange}
             addPreset={addPreset}

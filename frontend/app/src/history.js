@@ -207,51 +207,107 @@ export function ReviewView({ item, onBack }) {
         </div>
 
         {/* RIGHT: Fields panel */}
-        <div className="dv-fields-pane">
-          <div className="dv-pane-label">
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" stroke="currentColor" width="13" height="13">
-              <polyline points="9 11 12 14 22 4" />
-              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-            </svg>
-            Extracted Fields &nbsp;
-            <span className="dv-field-count">{totalFields} fields</span>
-          </div>
+        <div
+  className="dv-fields-pane-v2"
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    padding: 0,
+    overflow: "hidden",
+  }}
+>
+  <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
+    {/* Header */}
+    <div className="dv-pane-header-v2" style={{ marginBottom: "14px" }}>
+      <div className="dv-pane-label-v2">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          strokeWidth="1.8"
+          stroke="currentColor"
+          width="14"
+          height="14"
+        >
+          <polyline points="9 11 12 14 22 4" />
+          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+        </svg>
 
-          <div className="dv-fields-list">
-            {entries.length === 0 ? (
-              <div className="dv-pdf-fallback">No extracted fields found.</div>
-            ) : (
-              entries.map(([key, val], idx) => {
-                const isEmpty = val === null || val === undefined;
-                const status = isEmpty ? "pending" : "approved";
-                const displayVal = formatValue(val);
-                const lineCount = displayVal.split("\n").length;
+        EXTRACTED FIELDS
+      </div>
 
-                return (
-                  <div key={key} className={`dv-field-card dv-status-${status}`}>
-                    <div className="dv-field-card-top">
-                      <div className="dv-field-left">
-                        <span className="dv-field-idx">{String(idx + 1).padStart(2, "0")}</span>
-                        <span className="dv-field-key">{key}</span>
-                      </div>
-                      <div className="dv-field-actions">
-                        <span className={`dv-status-badge dv-badge-${status}`}>
-                          {isEmpty ? "● null" : "✓ Extracted"}
-                        </span>
-                      </div>
-                    </div>
-                    <textarea
-                      className="dv-field-value"
-                      value={displayVal}
-                      readOnly
-                      rows={Math.min(8, Math.max(2, lineCount + 1))}
-                    />
-                  </div>
-                );
-              })
-            )}
-          </div>
+      <span className="dv-field-count-pill">
+        {totalFields} FIELDS
+      </span>
+    </div>
+
+    {/* Cards */}
+    <div className="dv-fields-cards-grid">
+      {entries.length === 0 ? (
+        <div className="dv-pdf-fallback">
+          No extracted fields found.
         </div>
+      ) : (
+        entries.map(([key, val], idx) => {
+          const isNull =
+            val === null ||
+            val === undefined ||
+            val === "";
+
+          const status = isNull ? "pending" : "approved";
+
+          return (
+            <div
+              key={key}
+              className={`dv-field-card-v3 status-${status}`}
+            >
+              {/* Header */}
+              <div className="dv-card-header-v3">
+                <div className="dv-card-num-label">
+                  <span className="dv-card-num">
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+
+                  <span className="dv-card-label">
+                    {key}
+                  </span>
+                </div>
+
+                <span
+                  className={`dv-card-badge badge-${
+                    isNull ? "pending" : "approved"
+                  }`}
+                >
+                  {isNull
+                    ? "— Not Found"
+                    : "✓ Extracted"}
+                </span>
+              </div>
+
+              {/* Body */}
+              <div className="dv-card-body-v3">
+                <textarea
+                  className={`dv-card-textarea ${
+                    isNull ? "null-val" : ""
+                  }`}
+                  value={formatValue(val)}
+                  readOnly
+                  rows={Math.min(
+                    8,
+                    Math.max(
+                      2,
+                      formatValue(val).split("\n").length + 1
+                    )
+                  )}
+                  placeholder="No value found"
+                />
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  </div>
+</div>
       </div>
     </div>
   );

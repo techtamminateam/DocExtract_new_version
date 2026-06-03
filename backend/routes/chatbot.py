@@ -12,6 +12,7 @@ import logging
 from datetime import datetime
 from flask import Blueprint, request, jsonify, session
 from langchain_core.messages import HumanMessage, AIMessage
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -103,10 +104,31 @@ def message():
     history = _load_history(session_id)   # includes the new user message
 
     try:
-        from chatbot.graph import invoke_graph, SYSTEM
-        messages = [SYSTEM] + history
+        from chatbot.graph import invoke_graph, system
+        messages = [system] + history[-7:]
+
+        # Build a plain-text string for token counting (extract .content from message objects)
+        text_to_count = "\n".join(getattr(m, "content", "") for m in messages)
+        import google.generativeai as genai
+        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        token_count = model.count_tokens(text_to_count)
+        print(f"📨 Tokens for message '{user_msg[:50]}...': {token_count.total_tokens}")
+
         result = invoke_graph({"messages": messages})
-        reply = result["messages"][-1].content
+
+        # Normalize the LLM reply into a single string
+        raw = result["messages"][-1].content
+        if isinstance(raw, list):
+            reply = "\n".join(map(str, raw))
+        elif isinstance(raw, dict) and "content" in raw:
+            reply = str(raw["content"])
+        else:
+            reply = str(raw)
+
+        # Count reply tokens safely
+        reply_token_count = model.count_tokens(reply)
+        logger.info(f"🤖 Reply tokens: {reply_token_count.total_tokens}")
         logger.info(f"Chat reply for session {session_id}: {reply[:80]}...")
     except Exception as e:
         logger.error(f"Graph error: {e}", exc_info=True)
@@ -158,4 +180,3 @@ def status():
         return jsonify({"session_id": session_id, "message_count": count})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    

@@ -7,7 +7,7 @@ sender_email = os.getenv('EMAIL')
 sender_password = os.getenv('PASSWORD')
 
 class Config:
-    SQLALCHEMY_DATABASE_URI = "sqlite:///document_extraction.db"
+    SQLALCHEMY_DATABASE_URI = "postgresql://postgres:123456@localhost:5432/AiExtract"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 class UploadConfig:

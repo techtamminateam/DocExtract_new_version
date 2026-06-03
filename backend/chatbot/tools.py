@@ -4,50 +4,54 @@ from models import *
 from sqlalchemy import func, desc
 from datetime import datetime, timedelta
 import json
+import psycopg2
+import os
+from typing import List, Optional
+from pydantic import BaseModel, Field
 
 @tool
-def get_template_info(template_name: str) -> str:
-    """
-    Get detailed information about an AIExtracter preset template.
-    Templates: Healthcare Documents, Financial Statements, MSA Extraction,
-    Invoice Checking, Legal Documents, SOW Extraction.
-    Returns use cases, key fields extracted, tips, and common issues.
-    """
-    template = Template.query.filter_by(template_name=template_name).first()
-    if not template:
-        return json.dumps({"error": "Template not found"})
-
-    return json.dumps({
-        "template_name": template.template_name,
-        "data_points": template.data_points
-    })
-
-@tool
-def list_all_templates_name_only() -> str:
-    """
-    List all available AIExtracter preset templates by name.
-    Returns a list of template names.
-    """
-    templates = Template.query.with_entities(Template.template_name).all()
-    template_names = [t.template_name for t in templates]
-    print(f"Available templates: {template_names}")  # Debug print to verify template retrieval
-    return json.dumps(template_names)
-
-@tool
-def list_all_templates_with_details() -> str:
-    """
-    List all available AIExtracter preset templates with details.
-    Returns a list of templates with their name, use cases, key fields, tips, and common issues.
-    """
-    templates = Template.query.all()
-    template_details = []
-    for template in templates:
-        template_details.append({
-            "template_name": template.template_name,
-            "data_points": template.data_points
-        })
-    return json.dumps(template_details)\
+def execute_query(sql: str, params: Optional[str] = None) -> str:
+    """Execute a dynamic SQL query on the database. 
+    Use this to answer any data-related question by writing appropriate SQL.
     
+    Args:
+        sql: A safe SELECT SQL query (no mutations allowed)
+        params: Optional JSON string of parameters for parameterized queries (e.g., '["value1", "value2"]')
+    """
+    if not sql.strip().lower().startswith("select"):
+        return json.dumps({"error": "Only SELECT queries are allowed for safety."})
+    
+    # Parse params if provided as JSON string
+    parsed_params = None
+    if params:
+        try:
+            parsed_params = json.loads(params) if isinstance(params, str) else params
+        except json.JSONDecodeError:
+            return json.dumps({"error": "Invalid JSON format for params"})
+    
+    conn = psycopg2.connect(
+        host=os.getenv("DB_HOST", "localhost"),
+        database=os.getenv("DB_NAME", "AiExtract"),
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASSWORD", "123456")
+    )
+    
+    try:
+        with conn.cursor() as cursor:
+            if parsed_params:
+                cursor.execute(sql, parsed_params)
+            else:
+                cursor.execute(sql)
+            result = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            return json.dumps([dict(zip(columns, row)) for row in result])
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    finally:
+        conn.close()
+
+
+   
 @tool
 def get_recent_extraction_records(limit: int = 5) -> str:
     """
@@ -168,9 +172,6 @@ def get_extraction_by_template(template_name: str) -> str:
         
 # All tools exported
 AIEXTRACTER_TOOLS = [
-    get_template_info,
-    list_all_templates_name_only,
-    list_all_templates_with_details,
     get_recent_extraction_records,
     get_extraction_records_by_date_range,
     get_extraction_record_by_filename,
