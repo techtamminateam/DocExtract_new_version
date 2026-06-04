@@ -499,7 +499,7 @@ const AIExtracterLanding = ({ onLoginSuccess }) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/verify-code`, {
+      const response = await fetch(`${API_URL}/register/verify-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -138,9 +138,9 @@ button {
   align-items: center;
   gap: 10px;
   height: 44px;
-  padding: 0 16px;
+  padding: 0 12px;
   border-radius: 999px;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -837,7 +837,6 @@ button {
 
 .template-card {
   display: grid;
-  grid-template-columns: auto 1fr auto;
   gap: 12px;
   align-items: center;
 }
@@ -1048,6 +1047,65 @@ button {
 
   .profile-page-title {
     font-size: 1.45rem;
+  }
+}
+.profile-edit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.profile-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.profile-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-form-group label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.profile-form-group input {
+  height: 46px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.88);
+  padding: 0 14px;
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.profile-form-group input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(79, 142, 247, 0.14);
+}
+
+.profile-form-group p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.profile-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 860px) {
+  .profile-form-grid {
+    grid-template-columns: 1fr;
   }
 }
 

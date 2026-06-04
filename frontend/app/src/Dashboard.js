@@ -56,6 +56,33 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
   const dateRef = useRef(null);
   const intervalRef = useRef(null);
   const filterRef = useRef(null);
+  const [profileForm, setProfileForm] = useState({
+      full_name: "",
+      avatar_url: "",
+      job_title: "",
+    });
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const userId = localStorage.getItem("id");
+
+      try {
+        const response = await fetch(`http://127.0.0.1:5000/api/profile/${userId}`);
+        if (!response.ok) throw new Error("Failed to fetch profile");
+        const result = await response.json();
+        setProfileForm({
+          full_name: result.full_name || "",
+          avatar_url: result.avatar_url || "",
+          job_title: result.job_title || "",
+      });
+      } catch (err) {
+        console.error("Error fetching profile:", err);
+      }
+    };
+    fetchProfile();
+
+  }, []);
+
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -291,10 +318,10 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
           <div className="nav-divider"></div>
           
           <div className="user-profile" onClick={() => setActiveNav?.("profile")} style={{ cursor: 'pointer' }}>
-            <img src="https://i.pravatar.cc/150?img=68" alt="Avatar" className="avatar" />
+            <img src={profileForm.avatar_url} alt="Avatar" className="avatar" />
             <div className="user-info">
-              <span className="user-name">Young Alaska</span>
-              <span className="user-role">Business</span>
+              <span className="user-name">{profileForm.full_name}</span>
+              <span className="user-role">{profileForm.job_title}</span>
             </div>
           </div>
         </div>

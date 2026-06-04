@@ -1,16 +1,16 @@
 from flask import Blueprint, request, jsonify
-from models import db, User
+from models import db, User, UserSession, UserProfile
 from flask_mail import Mail, Message
 from mail_extension import mail
 import os
 import random
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
 
 login_bp = Blueprint("login_bp", __name__)
-
 
 
 @login_bp.route("login/register", methods=["POST"])
@@ -21,19 +21,39 @@ def register():
 
     if not email or not password:
         return jsonify({"error": "Email and password are required"}), 400
-    else:
-        try:
-            existing_user = User.query.filter_by(email=email).first()
-            if existing_user:
-                return jsonify({"error": "Email already exists"}), 400
-            
-            user = User(email=email)
-            user.set_password(password)
-            db.session.add(user)
-            db.session.commit()
-            return jsonify({"message": "User registered successfully"}), 201
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+    
+    try:
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            return jsonify({"error": "Email already exists"}), 400
+        
+        user = User(email=email)
+        user.set_password(password)
+        
+        # 1. Add and flush user to generate the user.id integer
+        db.session.add(user)
+        db.session.flush() 
+        
+        user_profile = UserProfile(
+            user_id=user.id,                    # 2. Changed from 'user' to 'user.id'
+            full_name=email.split('@')[0],
+            avatar_url="",
+            job_title="Software Engineer",
+            company_name="Tech Tammina",
+            phone_number="123-456-7890",
+            timezone="UTC",
+            created_at=datetime.utcnow(),   # 4. Added () to execute function
+        )
+        print(email.split('@')[0])
+        
+        db.session.add(user_profile)
+        db.session.commit()
+        return jsonify({"message": "User registered successfully"}), 201
+        
+    except Exception as e:
+        db.session.rollback() # Good practice: rollback on failure
+        return jsonify({"error": str(e)}), 500
+
 
 from flask_jwt_extended import create_access_token
 
@@ -46,7 +66,11 @@ def login():
     user = User.query.filter_by(email=email).first()
     if not user or not user.check_password(password) or not user.is_verified:
         return jsonify({"error": "Invalid email or password"}), 401
-
+    profile = UserProfile.query.filter_by(user_id=user.id).first()
+    if profile:
+        profile.last_seen_at = datetime.utcnow()
+        db.session.commit()
+    
     access_token = create_access_token(identity=user.id)
     return jsonify(access_token=access_token, user = {"email": user.email, "id": user.id}), 200
 
@@ -161,7 +185,7 @@ def send_otp():
             'error': str(e)
         }), 500
 
-@login_bp.route('/verify_otp', methods=['POST'])
+@login_bp.route('/change_email/verify_otp', methods=['POST'])
 def verify_otp():
     data = request.get_json()
     email = data.get('email')
@@ -181,7 +205,7 @@ def verify_otp():
     }), 200
 
 
-@login_bp.route('/verify-code', methods=['POST'])
+@login_bp.route('/register/verify-code', methods=['POST'])
 def verify_code():
     data = request.get_json()
     email = data.get('email')
@@ -192,6 +216,21 @@ def verify_code():
     if user:
         user.is_verified = True
         user.verification_code = None
+        db.session.commit()
+        db.session.flush() 
+        
+        user_profile = UserProfile(
+            user_id=user.id,                    # 2. Changed from 'user' to 'user.id'
+            full_name=email.split('@')[0],
+            avatar_url="",
+            job_title="Software Engineer",
+            company_name="Tech Tammina",
+            phone_number="123-456-7890",
+            timezone="UTC",
+            created_at=datetime.utcnow()    # 4. Added () to execute function
+        )
+        
+        db.session.add(user_profile)
         db.session.commit()
         return jsonify({
             'message': 'Verification successful',
@@ -270,3 +309,4 @@ def reset_password():
     return jsonify({
         'message': 'Password reset successful'
     }), 200
+

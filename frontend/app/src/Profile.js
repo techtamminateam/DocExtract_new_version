@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+
 import {
   Area,
   AreaChart,
@@ -46,6 +47,7 @@ import {
 } from 'lucide-react';
 import './Profile.css';
 
+const API_URL = "http://localhost:5000/api";
 const heroStats = [
   { label: 'Documents Processed', value: 12458, suffix: '', tone: 'blue' },
   { label: 'Extraction Accuracy', value: 99.4, suffix: '%', tone: 'green' },
@@ -296,6 +298,77 @@ function WorkspaceHealthRing() {
 }
 
 export function Profile() {
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  const [profileForm, setProfileForm] = useState({
+    full_name: "",
+    avatar_url: "",
+    job_title: "",
+    company_name: "",
+    phone_number: "",
+    email: localStorage.getItem("email") || "",
+    userId : localStorage.getItem("id") || "",
+  });
+
+  const [stats, setStats] = useState({
+    documnets_count:"",
+    extraction_accuracy:"",
+    templates_created:"",
+    active_integrations:"",
+  });
+  
+
+  useEffect(() => {
+    const fecthStats = async () => {
+      try {
+        const userId = localStorage.getItem("id");
+        const response = await fetch(`${API_URL}/profile/stats/${userId}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch stats");
+        }
+        const result = await response.json();
+        setStats({
+          documnets_count: result.documents_count,
+          templates_created: result.template_count
+        });
+      } catch (error) {
+        console.assert(error.message);
+      }
+    };
+
+    fecthStats();
+  }, []);
+
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const userId = localStorage.getItem("id");
+        if (!userId) return;
+
+        const response = await fetch(`${API_URL}/profile/${userId}`);
+        const result = await response.json();
+
+        if (!response.ok) throw new Error(result.error || "Failed to load profile");
+
+        setProfileForm({
+          full_name: result.full_name || "",
+          avatar_url: result.avatar_url || "",
+          job_title: result.job_title || "",
+          company_name: result.company_name || "",
+          phone_number: result.phone_number || "",
+          email: result.email || localStorage.getItem("email") || "",
+        });
+      } catch (error) {
+        console.error("Profile load error:", error.message);
+      }
+    };
+
+    loadProfile();
+  }, []);
+
+const [profileErrors, setProfileErrors] = useState({});
   const totalExports = useMemo(
     () =>
       exportStats.reduce(
@@ -304,6 +377,49 @@ export function Profile() {
       ),
     []
   );
+  const handleSaveProfile = async () => {
+    const newErrors = {};
+
+    if (!profileForm.full_name.trim()) {
+      newErrors.full_name = "Full name is required";
+    }
+
+    setProfileErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
+
+    try {
+      setIsSavingProfile(true);
+
+      const userId = localStorage.getItem("id");
+
+      const response = await fetch(`${API_URL}/profile/update`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          full_name: profileForm.full_name,
+          avatar_url: profileForm.avatar_url,
+          job_title: profileForm.job_title,
+          company_name: profileForm.company_name,
+          phone_number: profileForm.phone_number,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update profile");
+      }
+
+      setIsEditingProfile(false);
+      setProfileErrors({});
+    } catch (error) {
+      setProfileErrors({ general: error.message });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   return (
     <div className="aix-profile-page">
@@ -323,19 +439,99 @@ export function Profile() {
             and subscription intelligence from a unified enterprise-grade dashboard.
           </p>
         </div>
-
-        <div className="profile-top-actions">
-          <button className="ghost-action-btn">
-            <RefreshCcw size={16} />
-            Refresh Insights
-          </button>
-          <button className="primary-action-btn">
-            <ArrowUpRight size={16} />
-            Open Admin Console
-          </button>
-        </div>
       </header>
+      {isEditingProfile && (
+        <section className="glass-card span-12 profile-edit-card">
+          <div className="section-header-row">
+            <div>
+              <span className="section-eyebrow">Profile Settings</span>
+              <h3 className="section-title">Update your profile</h3>
+              <p className="section-subtitle">
+                Add your personal and company details here.
+              </p>
+            </div>
+          </div>
 
+          <div className="profile-form-grid">
+            <div className="profile-form-group">
+              <label>Full Name</label>
+              <input
+                type="text"
+                value={profileForm.full_name}
+                onChange={(e) =>
+                  setProfileForm({ ...profileForm, full_name: e.target.value })
+                }
+                placeholder="Enter full name"
+              />
+              {profileErrors.full_name && <p>{profileErrors.full_name}</p>}
+            </div>
+
+            <div className="profile-form-group">
+              <label>Avatar URL</label>
+              <input
+                type="url"
+                value={profileForm.avatar_url}
+                onChange={(e) =>
+                  setProfileForm({ ...profileForm, avatar_url: e.target.value })
+                }
+                placeholder="https://example.com/avatar.png"
+              />
+            </div>
+
+            <div className="profile-form-group">
+              <label>Job Title</label>
+              <input
+                type="text"
+                value={profileForm.job_title}
+                onChange={(e) =>
+                  setProfileForm({ ...profileForm, job_title: e.target.value })
+                }
+                placeholder="Enter job title"
+              />
+            </div>
+
+            <div className="profile-form-group">
+              <label>Company Name</label>
+              <input
+                type="text"
+                value={profileForm.company_name}
+                onChange={(e) =>
+                  setProfileForm({ ...profileForm, company_name: e.target.value })
+                }
+                placeholder="Enter company name"
+              />
+            </div>
+
+            <div className="profile-form-group">
+              <label>Phone Number</label>
+              <input
+                type="tel"
+                value={profileForm.phone_number}
+                onChange={(e) =>
+                  setProfileForm({ ...profileForm, phone_number: e.target.value })
+                }
+                placeholder="Enter phone number"
+              />
+            </div>
+          </div>
+
+          <div className="profile-form-actions">
+            <button
+              className="ghost-action-btn"
+              onClick={() => setIsEditingProfile(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="primary-action-btn"
+              onClick={handleSaveProfile}
+              disabled={isSavingProfile}
+            >
+              {isSavingProfile ? "Saving..." : "Save Profile"}
+            </button>
+          </div>
+        </section>
+      )}
       <main className="dashboard-grid">
         <motion.section
           className="glass-card hero-card span-12"
@@ -351,13 +547,16 @@ export function Profile() {
                 <div className="hero-avatar-shell">
                   <img
                     className="hero-avatar"
-                    src="https://i.pravatar.cc/150?img=68"
-                    alt="John Doe"
+                    src={profileForm.avatar_url || ""}
+                    alt={profileForm.full_name || "User avatar"}
                   />
                   <span className="hero-avatar-status" />
                 </div>
-                <button className="icon-pill-btn" aria-label="More profile actions">
-                  <MoreHorizontal size={18} />
+                <button
+                  className="ghost-action-btn"
+                  onClick={() => setIsEditingProfile(true)}
+                >
+                  Edit Profile
                 </button>
               </div>
 
@@ -366,36 +565,90 @@ export function Profile() {
                   <span className="hero-chip hero-chip-primary">Professional Plan</span>
                   <span className="hero-chip">Workspace Admin</span>
                 </div>
-                <h2>John Doe</h2>
-                <p>Document Operations Manager</p>
+                  <h2>{profileForm.full_name || "Complete your profile"}</h2>
+                  <p>{profileForm.job_title || "Add your job title"}</p>
                 <div className="hero-company-row">
-                  <span>Acme Corporation</span>
+                  <span>{profileForm.company_name || "Add your company name"}</span>
                   <span className="dot-separator" />
-                  <span>Member since Jan 2026</span>
+                  <span>{profileForm.email || "No email available"}</span>
                 </div>
               </div>
+              
             </div>
 
             <div className="hero-kpi-grid">
-              {heroStats.map((item, index) => (
+              
                 <motion.div
-                  className={`hero-kpi-card tone-${item.tone}`}
-                  key={item.label}
+                  className={"hero-kpi-card tone-blue"}
+                  key="Documents Processed"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + index * 0.08, duration: 0.45 }}
+                  transition={{ delay: 0.1 + 0 * 0.08, duration: 0.45 }}
                 >
-                  <span className="hero-kpi-label">{item.label}</span>
+                  <span className="hero-kpi-label">Documents Processed</span>
                   <CountUp
-                    value={item.value}
-                    suffix={item.suffix}
-                    decimals={String(item.value).includes('.') ? 1 : 0}
+                    value={stats.documnets_count}
+                    suffix=""
+                    decimals={String(stats.documnets_count).includes('.') ? 1 : 0}
                   />
                   <span className="hero-kpi-helper">
-                    {item.label === 'Extraction Accuracy' ? 'Best-in-class pipeline quality' : 'Updated in real time'}
+                    Updated in real time
+                  </span>
+                  
+                </motion.div>
+                <motion.div
+                  className={"hero-kpi-card tone-green"}
+                  key="Documents Processed"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 + 1 * 0.08, duration: 0.45 }}
+                >
+                  <span className="hero-kpi-label">Extraction Accuracy</span>
+                  <CountUp
+                    value={stats.extraction_accuracy || "0"}
+                    suffix=""
+                    decimals={String(stats.extraction_accuracy).includes('.') ? 1 : 0}
+                  />
+                  <span className="hero-kpi-helper">
+                    Updated in real time
                   </span>
                 </motion.div>
-              ))}
+                <motion.div
+                  className={"hero-kpi-card tone-violet"}
+                  key="Templates Created"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 + 2 * 0.08, duration: 0.45 }}
+                >
+                  <span className="hero-kpi-label">Templates Created</span>
+                  <CountUp
+                    value={stats.templates_created || "0"}
+                    suffix=""
+                    decimals={String(stats.templates_created).includes('.') ? 1 : 0}
+                  />
+                  <span className="hero-kpi-helper">
+                    Updated in real time
+                  </span>
+                  
+                </motion.div>
+                <motion.div
+                  className={"hero-kpi-card tone-amber"}
+                  key="Active Integrations"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 + 3 * 0.08, duration: 0.45 }}
+                >
+                  <span className="hero-kpi-label">Active Integrations</span>
+                  <CountUp
+                    value={stats.documnets_count || "0"}
+                    suffix=""
+                    decimals={String(stats.documnets_count).includes('.') ? 1 : 0}
+                  />
+                  <span className="hero-kpi-helper">
+                    Updated in real time
+                  </span>
+                </motion.div>
+    
             </div>
           </div>
         </motion.section>

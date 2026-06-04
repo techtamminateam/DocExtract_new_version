@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, use } from "react";
 import {BrainCircuit, Play, User, Bell, Shield, KeyRound, CreditCard, Plus, LayoutGrid, Hash, Clock3, Trash2, Activity, DollarSign, ShieldCheck, FileText, Calendar, Users, Type, Wand2, FilePlus2, CheckSquare, Mail, Building2, CalendarDays, MessageSquare, AlertCircle, ChevronDown, ChevronRight, Check, Save, Download, Eye, EyeOff, CheckCircle, AlertTriangle, Info, RefreshCw, Clock } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./DocExtract.css";
@@ -1843,7 +1843,7 @@ const response = await fetch(`${BACKEND_URL}/change_password`, {
       return;
     }
     
-    const response = await fetch(`${BACKEND_URL}/verify_otp`, {
+    const response = await fetch(`${BACKEND_URL}/change_email/verify_otp`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -3351,8 +3351,9 @@ export default function DocExtract({ onLogout }) {
   useEffect(() => {
     // Clear results when file or data points change
     setSelectedPreset(PRESETS_POLICY_CHECKING);
-  }, []);
 
+  }, []);
+ 
   const fileInputRef = useRef(null);
   const resultSecRef = useRef(null);
 
@@ -3637,6 +3638,8 @@ export default function DocExtract({ onLogout }) {
 
   // ── Extraction ─────────────────────────────────────────────────────────────
   const runExtraction = async () => {
+    console.log(localStorage.getItem("id"))
+    console.log("the user id is ", localStorage.getItem("id"))
     if (files.length === 0) {
       setError("Please upload at least one PDF file.");
       return;
@@ -3656,8 +3659,14 @@ export default function DocExtract({ onLogout }) {
     const payload = dataPoints.map((d) => ({ field: d.field.trim(), prompt: d.prompt.trim() }));
     const fd = new FormData();
     files.forEach(f => fd.append("pdf", f));   // ← all files under key "pdf"
+    fd.append("upload_source", uploadSource);
+    fd.append("file_size", files.reduce((acc, f) => acc + f.size, 0));
+    fd.append("file_count", files.length);
+    fd.append("file_type", "pdf");
+    fd.append("user_id", localStorage.getItem("id") || "");
     fd.append("data_points", JSON.stringify(payload));
     fd.append("preset", preset);
+    
 
     try {
       setProg({ show: true, pct: 25, msg: `Extracting text from ${files.length} PDF${files.length > 1 ? "s" : ""} (OCR if needed)…` });

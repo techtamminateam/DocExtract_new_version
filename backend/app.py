@@ -23,7 +23,17 @@ from config import Config, UploadConfig, MailConfig
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
 
-from models import db, ExtractionRecord, ExtractionResultStatus, Template, User, ChatHistory
+from models import (
+    db,
+    ExtractionRecord,
+    ExtractionResultStatus,
+    Template,
+    Document,
+    User,
+    ChatHistory,
+    UserProfile,
+    UserSession,
+)
 from routes.history import history_bp
 from routes.dashboard import result_status_bp
 from routes.templates_tab import template_bp
@@ -32,6 +42,10 @@ from routes.oneDrive import one_drive_bp
 from routes.google_sheets import sheets_bp
 from routes.chatbot import chatbot_bp
 from routes.login import login_bp
+from routes.profile import profile_bp
+
+
+
 from flask_mail import Mail, Message
 
 mail = Mail()
@@ -67,7 +81,7 @@ app.register_blueprint(one_drive_bp, url_prefix="/api")
 app.register_blueprint(sheets_bp, url_prefix="/api")
 app.register_blueprint(chatbot_bp, url_prefix="/api")
 app.register_blueprint(login_bp, url_prefix="/api")
-
+app.register_blueprint(profile_bp, url_prefix="/api")
 
 
 
@@ -526,6 +540,33 @@ def extract():
                     timestamp=timestamp
                 )
                 db.session.add(extraction_record)
+                db.session.commit()
+
+                user_id_raw = (request.form.get("user_id") or "").strip()
+                file_size_raw = (request.form.get("file_size") or "0").strip()
+                file_type = (request.form.get("file_type") or "pdf").strip()
+                source_type = (request.form.get("upload_source") or "local").strip()
+                selected_template = template_name
+
+                template_id = Template.query.filter_by(template_name=selected_template).first().id
+                print(template_id)
+
+                try:
+                    user_id = int(user_id_raw) if user_id_raw else None
+                    file_size = int(file_size_raw) if file_size_raw else 0
+                except (TypeError, ValueError):
+                    user_id = None
+                    file_size = 0
+
+                document = Document(
+                    user_id=user_id,
+                    filename=pdf_file.filename,
+                    file_size=file_size,
+                    file_type=file_type,
+                    source_type=source_type,
+                    template_id=template_id
+                )
+                db.session.add(document)
                 db.session.commit()
 
                 # ── Save initial result status with all fields as "pending" ──────────
