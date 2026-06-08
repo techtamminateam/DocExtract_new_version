@@ -14,14 +14,8 @@ class ExtractionRecord(db.Model):
     pdf_filename = db.Column(db.String(255))
     data_points = db.Column(db.JSON, nullable=False)
     results = db.Column(db.JSON, nullable=True)
-
-
-class ExtractionResultStatus(db.Model):
-    __tablename__ = "extraction_result_status"
-
-    id = db.Column(db.Integer, primary_key=True)
-    pdf_filename = db.Column(db.String(255), unique=True)
     result_status = db.Column(db.JSON, nullable=False)
+
 
 class Template(db.Model):
     __tablename__ = "templates"
@@ -101,6 +95,7 @@ class Document(db.Model):
     file_type = db.Column(db.String(50), nullable=False, index=True)
     source_type = db.Column(db.String(50), nullable=True)
     deleted_at = db.Column(db.DateTime, nullable=True)
+    document_id = db.Column(db.Integer, nullable=False, unique=True)
     template = db.relationship('Template', backref=db.backref('documents', lazy=True))
 
 class UserSession(db.Model):
@@ -196,3 +191,25 @@ class DailyMetrics(db.Model):
         db.Index('ix_daily_user_date', 'user_id', 'metric_date'),
     )
 
+class Subscriptions(db.Model):
+    __tablename__ = "subscriptions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    plan = db.Column(db.String(50), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    order_id = db.Column(db.String(255), nullable=True)
+    payment_id = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(20), nullable=False, default='inactive')
+    start_date = db.Column(db.DateTime, nullable=True)
+    end_date = db.Column(db.DateTime, nullable=True)
+
+class BillingHistory(db.Model):
+    __tablename__ = "billing_history"
+
+    id = db.Column(db.Integer, primary_key=True)
+    invoice = db.Column(db.String(255), nullable=False)
+    date = db.Column(db.DateTime, nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(20), nullable=False)
+    tracking = db.Column(db.JSON, nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)

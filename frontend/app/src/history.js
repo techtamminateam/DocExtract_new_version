@@ -82,66 +82,87 @@ export function deletePdf(id) {
 
 export function ReviewView({ item, onBack }) {
   const [blobUrl, setBlobUrl] = useState(null);
-  const [pdfError, setPdfError] = useState(false);
-  const [pdfErrorMessage, setPdfErrorMessage] = useState("");
-  const [pdfLoading, setPdfLoading] = useState(true);
+  const [previewError, setPreviewError] = useState(false);
+  const [previewErrorMessage, setPreviewErrorMessage] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(true);
 
   const entries = Object.entries(item.results || {});
   const totalFields = entries.length;
   const extractedCount = entries.filter(([, v]) => v !== null && v !== undefined).length;
 
-  // Fetch the PDF as a blob so the browser treats it as same-origin — avoids
-  // all cross-origin / Content-Disposition / X-Frame-Options problems.
+  const fileName = item.file_name || item.pdf_filename || "";
+  const lowerFileName = fileName.toLowerCase();
+  const isPdf = lowerFileName.endsWith(".pdf");
+  const isImage = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"].some((ext) =>
+    lowerFileName.endsWith(ext)
+  );
+
   useEffect(() => {
-    if (!item.pdf_filename) {
-      setPdfLoading(false);
-      setPdfError(true);
-      setPdfErrorMessage("No PDF file associated with this extraction.");
+    if (!fileName) {
+      setPreviewLoading(false);
+      setPreviewError(true);
+      setPreviewErrorMessage("No file associated with this extraction.");
       return;
     }
 
     let objectUrl = null;
-    setPdfLoading(true);
-    setPdfError(false);
-    setPdfErrorMessage("");
+    setPreviewLoading(true);
+    setPreviewError(false);
+    setPreviewErrorMessage("");
+    setBlobUrl(null);
 
-    fetch(`http://localhost:5000/api/pdf/${encodeURIComponent(item.pdf_filename)}`)
+    const endpoint = isPdf
+      ? `http://localhost:5000/api/pdf/${encodeURIComponent(fileName)}`
+      : `http://localhost:5000/api/file/${encodeURIComponent(fileName)}`;
+
+    fetch(endpoint)
       .then((res) => {
         if (!res.ok) {
           if (res.status === 404) {
-            throw new Error(`PDF file not found: ${item.pdf_filename}`);
+            throw new Error(`File not found: ${fileName}`);
           }
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         }
         return res.blob();
       })
       .then((blob) => {
-        // Check if blob has content
         if (blob.size === 0) {
-          throw new Error("PDF file is empty or corrupted");
+          throw new Error("File is empty or corrupted");
         }
-        // Force the MIME type so the browser's PDF viewer activates
-        const pdfBlob = new Blob([blob], { type: "application/pdf" });
-        objectUrl = URL.createObjectURL(pdfBlob);
+
+        let contentType = blob.type;
+        if (isPdf) {
+          contentType = "application/pdf";
+        } else if (isImage && !contentType) {
+          if (lowerFileName.endsWith(".png")) contentType = "image/png";
+          else if (lowerFileName.endsWith(".jpg") || lowerFileName.endsWith(".jpeg")) contentType = "image/jpeg";
+          else if (lowerFileName.endsWith(".webp")) contentType = "image/webp";
+          else if (lowerFileName.endsWith(".gif")) contentType = "image/gif";
+          else if (lowerFileName.endsWith(".bmp")) contentType = "image/bmp";
+        }
+
+        const typedBlob = new Blob([blob], {
+          type: contentType || "application/octet-stream",
+        });
+
+        objectUrl = URL.createObjectURL(typedBlob);
         setBlobUrl(objectUrl);
-        setPdfLoading(false);
+        setPreviewLoading(false);
       })
       .catch((err) => {
-        console.error("Failed to load PDF:", err);
-        setPdfError(true);
-        setPdfErrorMessage(err.message || "Failed to load PDF");
-        setPdfLoading(false);
+        console.error("Failed to load preview:", err);
+        setPreviewError(true);
+        setPreviewErrorMessage(err.message || "Failed to load preview");
+        setPreviewLoading(false);
       });
 
-    // Revoke the object URL when the component unmounts to free memory
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [item.pdf_filename]);
+  }, [fileName, isPdf, isImage, lowerFileName]);
 
   return (
     <div className="dv-root">
-      {/* ── Top bar ── */}
       <div className="dv-topbar">
         <button className="dv-back-btn" onClick={onBack}>
           <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke="currentColor" width="15" height="15">
@@ -155,12 +176,15 @@ export function ReviewView({ item, onBack }) {
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
             <polyline points="14 2 14 8 20 8" />
           </svg>
-          <span className="dv-filename">{item.pdf_filename || "Untitled"}</span>
+          <span className="dv-filename">{fileName || "Untitled"}</span>
           <div className="dv-topbar-stats">
             <span className="dv-stat approved">{extractedCount} extracted</span>
             <span className="dv-stat pending">{totalFields - extractedCount} null</span>
             {item.template_name && (
-              <span className="dv-stat" style={{ background: "var(--surface-3, #2a2a3a)", color: "var(--text-dim)" }}>
+              <span
+                className="dv-stat"
+                style={{ background: "var(--surface-3, #2a2a3a)", color: "var(--text-dim)" }}
+              >
                 {item.template_name}
               </span>
             )}
@@ -174,9 +198,7 @@ export function ReviewView({ item, onBack }) {
         </div>
       </div>
 
-      {/* ── Split pane ── */}
       <div className="dv-split">
-        {/* LEFT: PDF viewer */}
         <div className="dv-pdf-pane">
           <div className="dv-pane-label">
             <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" stroke="currentColor" width="13" height="13">
@@ -186,128 +208,142 @@ export function ReviewView({ item, onBack }) {
             Source Document
           </div>
 
-          {pdfLoading && (
-            <div className="dv-pdf-fallback">Loading PDF…</div>
+          {previewLoading && (
+            <div className="dv-pdf-fallback">Loading preview…</div>
           )}
-          {!pdfLoading && pdfError && (
+
+          {!previewLoading && previewError && (
             <div className="dv-pdf-fallback" style={{ color: "#ef4444" }}>
-              <div style={{ marginBottom: "12px" }}>⚠ PDF unavailable</div>
+              <div style={{ marginBottom: "12px" }}>⚠ Preview unavailable</div>
               <div style={{ fontSize: "12px", opacity: 0.8, lineHeight: "1.4" }}>
-                {pdfErrorMessage}
+                {previewErrorMessage}
               </div>
             </div>
           )}
-          {!pdfLoading && !pdfError && blobUrl && (
+
+          {!previewLoading && !previewError && blobUrl && isPdf && (
             <iframe
               className="dv-pdf-iframe"
               src={blobUrl}
               title="PDF Viewer"
             />
           )}
-        </div>
 
-        {/* RIGHT: Fields panel */}
-        <div
-  className="dv-fields-pane-v2"
-  style={{
-    display: "flex",
-    flexDirection: "column",
-    padding: 0,
-    overflow: "hidden",
-  }}
->
-  <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
-    {/* Header */}
-    <div className="dv-pane-header-v2" style={{ marginBottom: "14px" }}>
-      <div className="dv-pane-label-v2">
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          strokeWidth="1.8"
-          stroke="currentColor"
-          width="14"
-          height="14"
-        >
-          <polyline points="9 11 12 14 22 4" />
-          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-        </svg>
-
-        EXTRACTED FIELDS
-      </div>
-
-      <span className="dv-field-count-pill">
-        {totalFields} FIELDS
-      </span>
-    </div>
-
-    {/* Cards */}
-    <div className="dv-fields-cards-grid">
-      {entries.length === 0 ? (
-        <div className="dv-pdf-fallback">
-          No extracted fields found.
-        </div>
-      ) : (
-        entries.map(([key, val], idx) => {
-          const isNull =
-            val === null ||
-            val === undefined ||
-            val === "";
-
-          const status = isNull ? "pending" : "approved";
-
-          return (
+          {!previewLoading && !previewError && blobUrl && isImage && (
             <div
-              key={key}
-              className={`dv-field-card-v3 status-${status}`}
+              className="dv-pdf-fallback"
+              style={{
+                padding: "12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "auto",
+              }}
             >
-              {/* Header */}
-              <div className="dv-card-header-v3">
-                <div className="dv-card-num-label">
-                  <span className="dv-card-num">
-                    {String(idx + 1).padStart(2, "0")}
-                  </span>
-
-                  <span className="dv-card-label">
-                    {key}
-                  </span>
-                </div>
-
-                <span
-                  className={`dv-card-badge badge-${
-                    isNull ? "pending" : "approved"
-                  }`}
-                >
-                  {isNull
-                    ? "— Not Found"
-                    : "✓ Extracted"}
-                </span>
-              </div>
-
-              {/* Body */}
-              <div className="dv-card-body-v3">
-                <textarea
-                  className={`dv-card-textarea ${
-                    isNull ? "null-val" : ""
-                  }`}
-                  value={formatValue(val)}
-                  readOnly
-                  rows={Math.min(
-                    8,
-                    Math.max(
-                      2,
-                      formatValue(val).split("\n").length + 1
-                    )
-                  )}
-                  placeholder="No value found"
-                />
-              </div>
+              <img
+                src={blobUrl}
+                alt={fileName}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  objectFit: "contain",
+                  display: "block",
+                  borderRadius: "10px",
+                }}
+              />
             </div>
-          );
-        })
-      )}
-    </div>
-  </div>
-</div>
+          )}
+
+          {!previewLoading && !previewError && blobUrl && !isPdf && !isImage && (
+            <div className="dv-pdf-fallback" style={{ color: "#ef4444" }}>
+              Preview is not available for this file type.
+            </div>
+          )}
+        </div>
+
+        <div
+          className="dv-fields-pane-v2"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            padding: 0,
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
+            <div className="dv-pane-header-v2" style={{ marginBottom: "14px" }}>
+              <div className="dv-pane-label-v2">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  strokeWidth="1.8"
+                  stroke="currentColor"
+                  width="14"
+                  height="14"
+                >
+                  <polyline points="9 11 12 14 22 4" />
+                  <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                </svg>
+                EXTRACTED FIELDS
+              </div>
+
+              <span className="dv-field-count-pill">
+                {totalFields} FIELDS
+              </span>
+            </div>
+
+            <div className="dv-fields-cards-grid">
+              {entries.length === 0 ? (
+                <div className="dv-pdf-fallback">
+                  No extracted fields found.
+                </div>
+              ) : (
+                entries.map(([key, val], idx) => {
+                  const isNull = val === null || val === undefined || val === "";
+                  const status = isNull ? "pending" : "approved";
+
+                  return (
+                    <div
+                      key={key}
+                      className={`dv-field-card-v3 status-${status}`}
+                    >
+                      <div className="dv-card-header-v3">
+                        <div className="dv-card-num-label">
+                          <span className="dv-card-num">
+                            {String(idx + 1).padStart(2, "0")}
+                          </span>
+
+                          <span className="dv-card-label">
+                            {key}
+                          </span>
+                        </div>
+
+                        <span
+                          className={`dv-card-badge badge-${isNull ? "pending" : "approved"}`}
+                        >
+                          {isNull ? "— Not Found" : "✓ Extracted"}
+                        </span>
+                      </div>
+
+                      <div className="dv-card-body-v3">
+                        <textarea
+                          className={`dv-card-textarea ${isNull ? "null-val" : ""}`}
+                          value={formatValue(val)}
+                          readOnly
+                          rows={Math.min(
+                            8,
+                            Math.max(2, formatValue(val).split("\n").length + 1)
+                          )}
+                          placeholder="No value found"
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

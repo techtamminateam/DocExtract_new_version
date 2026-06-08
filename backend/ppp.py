@@ -377,6 +377,30 @@ def main(file_path, business, data_points_map, prompt_map):
     return normalize_dict_keys(regex_results)
 
 
+
+def extract_text_from_file(filepath: str, mimetype: str, filename: str) -> str:
+    name = (filename or "").lower()
+    mime = (mimetype or "").lower()
+
+    if mime == "application/pdf" or name.endswith(".pdf"):
+        return text_extract_from_pdf(filepath)
+    elif mime.startswith("image/") or name.endswith((".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff")):
+        return extract_text_from_image(filepath)
+    else:
+        raise ValueError(f"Unsupported file type: {mimetype or filename}")
+
+
+def extract_text_from_image(imagepath: str) -> str:
+    img = Image.open(imagepath).convert("RGB")
+    processed = preprocess_image_fast(img)
+    ocrtext = hybrid_ocr(processed)
+
+    if not ocrtext or not ocrtext.strip():
+        return ""
+
+    lines = [clean_text_for_llm(line) for line in ocrtext.splitlines() if line.strip()]
+    return "IMAGE OCR\n" + "\n".join(lines)
+
 # ---------------- RUN ----------------
 if __name__ == "__main__":
     from utils.data_points import (

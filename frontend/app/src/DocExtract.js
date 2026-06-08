@@ -6,6 +6,7 @@ import { History } from "./history";
 import { Dashboard } from "./Dashboard";
 import { Integration } from "./integration";
 import { Profile } from "./Profile";
+import BillingSettings from "./Billing";
 
 const BACKEND_URL = "http://localhost:5000/api";
 
@@ -1047,7 +1048,7 @@ function NewExtractionUI({
               >
                 <input 
                   type="file" 
-                  accept="application/pdf"
+                  accept="application/pdf,image/*"
                   multiple   
                   ref={fileInputRef} 
                   onChange={onFileChange}
@@ -1977,219 +1978,7 @@ const response = await fetch(`${BACKEND_URL}/change_password`, {
 
         <div className="settings-main-card">
           {activeTab === "Billings" ? (
-            <div className="settings-billing-detail-card">
-              <div className="settings-billing-block">
-                <h2>Payment Method</h2>
-                <p>Update your billing details and address.</p>
-              </div>
-
-              <div className="settings-billing-grid">
-                <div className="settings-billing-block">
-                  <h3>Card Details</h3>
-                  <p>Update your billing details and address.</p>
-                  <button
-                    className="settings-card-action"
-                    onClick={() => setShowExtraCard((prev) => !prev)}
-                  >
-                    {showExtraCard ? "Hide additional card" : "+ Add another card"}
-                  </button>
-                </div>
-                <div className="settings-card-form">
-                  <label>
-                    Name on your Card
-                    <input
-                      value={primaryCard.name}
-                      onChange={(e) => updatePrimaryCard("name", e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Expiry
-                    <input
-                      value={primaryCard.expiry}
-                      placeholder="MM/YYYY"
-                      onChange={(e) => updatePrimaryCard("expiry", formatExpiry(e.target.value))}
-                    />
-                  </label>
-                  <label>
-                    Card Number
-                    <div className="settings-input-wrapper">
-                      <input
-                        value={getCardValue(primaryCard.number, primaryCardFocused, showPrimaryNumber)}
-                        placeholder="•••• •••• •••• ••••"
-                        onChange={(e) => updatePrimaryCard("number", e.target.value.replace(/\D/g, "").slice(0, 16))}
-                        onFocus={() => setPrimaryCardFocused(true)}
-                        onBlur={() => setPrimaryCardFocused(false)}
-                      />
-                      <button
-                        type="button"
-                        className="settings-input-toggle-btn"
-                        onClick={() => setShowPrimaryNumber(!showPrimaryNumber)}
-                        title={showPrimaryNumber ? "Hide card number" : "Show card number"}
-                      >
-                        {showPrimaryNumber ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </label>
-                  <label>
-                    CVV
-                    <div className="settings-input-wrapper">
-                      <input
-                        value={getCvvValue(primaryCard.cvv, primaryCvvFocused, showPrimaryCvv)}
-                        placeholder="•••"
-                        onChange={(e) => updatePrimaryCard("cvv", e.target.value.replace(/\D/g, "").slice(0, 3))}
-                        onFocus={() => setPrimaryCvvFocused(true)}
-                        onBlur={() => setPrimaryCvvFocused(false)}
-                      />
-                      <button
-                        type="button"
-                        className="settings-input-toggle-btn"
-                        onClick={() => setShowPrimaryCvv(!showPrimaryCvv)}
-                        title={showPrimaryCvv ? "Hide CVV" : "Show CVV"}
-                      >
-                        {showPrimaryCvv ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              {showExtraCard && (
-                <div className="settings-extra-card">
-                  <div className="settings-billing-block">
-                    <h3>Additional Card</h3>
-                    <p>Add backup billing card details.</p>
-                  </div>
-                  <div className="settings-card-form">
-                    <label>
-                      Name on your Card
-                      <input
-                        placeholder="Enter cardholder name"
-                        value={extraCard.name}
-                        onChange={(e) => updateExtraCard("name", e.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Expiry
-                      <input
-                        placeholder="MM/YYYY"
-                        value={extraCard.expiry}
-                        onChange={(e) => updateExtraCard("expiry", formatExpiry(e.target.value))}
-                      />
-                    </label>
-                    <label>
-                      Card Number
-                      <div className="settings-input-wrapper">
-                        <input
-                          placeholder="•••• •••• •••• ••••"
-                          value={getCardValue(extraCard.number, extraCardFocused, showExtraNumber)}
-                          onChange={(e) => updateExtraCard("number", e.target.value.replace(/\D/g, "").slice(0, 16))}
-                          onFocus={() => setExtraCardFocused(true)}
-                          onBlur={() => setExtraCardFocused(false)}
-                        />
-                        <button
-                          type="button"
-                          className="settings-input-toggle-btn"
-                          onClick={() => setShowExtraNumber(!showExtraNumber)}
-                          title={showExtraNumber ? "Hide card number" : "Show card number"}
-                        >
-                          {showExtraNumber ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
-                    </label>
-                    <label>
-                      CVV
-                      <div className="settings-input-wrapper">
-                        <input
-                          placeholder="•••"
-                          value={getCvvValue(extraCard.cvv, extraCvvFocused, showExtraCvv)}
-                          onChange={(e) => updateExtraCard("cvv", e.target.value.replace(/\D/g, "").slice(0, 3))}
-                          onFocus={() => setExtraCvvFocused(true)}
-                          onBlur={() => setExtraCvvFocused(false)}
-                        />
-                        <button
-                          type="button"
-                          className="settings-input-toggle-btn"
-                          onClick={() => setShowExtraCvv(!showExtraCvv)}
-                          title={showExtraCvv ? "Hide CVV" : "Show CVV"}
-                        >
-                          {showExtraCvv ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              <div className="settings-contact-block">
-                <h3>Contact email</h3>
-                <p>Where should invoices be sent?</p>
-                <label className="settings-radio-row">
-                  <input
-                    type="radio"
-                    name="contactEmailMode"
-                    checked={contactMode === "existing"}
-                    onChange={() => setContactMode("existing")}
-                  />
-                  <span>Send to the existing email</span>
-                  <small>alex.johnson@company.com</small>
-                </label>
-                <label className="settings-radio-row">
-                  <input
-                    type="radio"
-                    name="contactEmailMode"
-                    checked={contactMode === "additional"}
-                    onChange={() => setContactMode("additional")}
-                  />
-                  <span>Add another email address</span>
-                </label>
-                {contactMode === "additional" && (
-                  <div className="settings-extra-email">
-                    <label>
-                      New billing email
-                      <input
-                        type="email"
-                        placeholder="name@company.com"
-                        value={additionalEmail}
-                        onChange={(e) => setAdditionalEmail(e.target.value)}
-                      />
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              <div className="settings-billing-card">
-                <div className="settings-billing-head">
-                  <h2>Billing History</h2>
-                  <p>See your recent subscription and add-on invoices.</p>
-                </div>
-                <div className="settings-billing-table-wrap">
-                  <table className="settings-billing-table">
-                    <thead>
-                      <tr>
-                        <th>Invoice</th>
-                        <th>Date</th>
-                        <th>Amount</th>
-                        <th>Status</th>
-                        <th>Tracking</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {billingRows.map((row) => (
-                        <tr key={row.tracking}>
-                          <td>{row.invoice}</td>
-                          <td>{row.date}</td>
-                          <td>{row.amount}</td>
-                          <td>
-                            <span className={`settings-status-badge ${row.status.toLowerCase()}`}>{row.status}</span>
-                          </td>
-                          <td>{row.tracking}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            <BillingSettings/>
           ) : activeTab === "Notifications" ? (
             <div className="notifications-tab-container">
               {/* Recent Notifications Section */}
@@ -3366,11 +3155,22 @@ export default function DocExtract({ onLogout }) {
     dataPoints.every((d) => d.field.trim() && d.prompt.trim());
 
   // ── File Handling ──────────────────────────────────────────────────────────
+  const ALLOWED_TYPES = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/tiff"
+];
   const applyFile = useCallback((f) => {
-    if (f && f.type === "application/pdf") {
-      setFiles(prev => prev.find(x => x.name === f.name) ? prev : [...prev, f]);
-    }
-  }, []);
+  if (!f) return;
+  if (ALLOWED_TYPES.includes(f.type)) {
+    setFiles(prev => prev.find(x => x.name === f.name) ? prev : [...prev, f]);
+  } else {
+    setError("Only PDF, PNG, JPG, JPEG, WEBP, and TIFF files are supported.");
+  }
+}, []);
 
   const switchUploadSource = (source) => {
     setUploadSource(source);
@@ -3658,11 +3458,11 @@ export default function DocExtract({ onLogout }) {
 
     const payload = dataPoints.map((d) => ({ field: d.field.trim(), prompt: d.prompt.trim() }));
     const fd = new FormData();
-    files.forEach(f => fd.append("pdf", f));   // ← all files under key "pdf"
+    files.forEach(f => fd.append("file", f));   // ← all files under key "pdf"
     fd.append("upload_source", uploadSource);
     fd.append("file_size", files.reduce((acc, f) => acc + f.size, 0));
     fd.append("file_count", files.length);
-    fd.append("file_type", "pdf");
+    fd.append("file_type", "mixed");
     fd.append("user_id", localStorage.getItem("id") || "");
     fd.append("data_points", JSON.stringify(payload));
     fd.append("preset", preset);

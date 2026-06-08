@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify
 import os
-from models import db, ExtractionResultStatus
+from models import db, ExtractionRecord
 import logging
 from collections import Counter
 import json
@@ -14,7 +14,7 @@ from collections import Counter
 @result_status_bp.route("/result_status", methods=["GET"])
 def result_status():
     try:
-        records = ExtractionResultStatus.query.all()
+        records = ExtractionRecord.query.all()
 
         pdf_files_count = len(records)
         status_count = Counter()

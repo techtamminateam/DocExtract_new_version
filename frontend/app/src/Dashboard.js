@@ -41,6 +41,11 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
   // Status and template filter state
   const [statusFilter, setStatusFilter] = useState("all");
   const [templateFilter, setTemplateFilter] = useState("all");
+  const [usage, setUsage] = useState({
+    "total_extractions": 0,
+    "templates_used": 0,
+    "storage_used": 0
+  })
 
   // Interval (frequency) state
   const [interval, setIntervalVal] = useState("Monthly");
@@ -112,6 +117,7 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
           flagged: Number(statusCount.flagged || 0),
           pending: Number(statusCount.pending || 0),
         });
+        console.log(dashboardMetrics);
       } catch (err) {
         console.error("Error fetching dashboard metrics:", err);
       }
@@ -119,6 +125,23 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
 
     fetchDashboardMetrics();
   }, [dateRange]);
+
+  useEffect(() => {
+    const fetchUsage = async () => {
+      try {
+        const response = await fetch("http://127.0.0.1:5000/api/history/usage");
+        if (!response.ok) throw new Error("Failed to fetch usage");
+        const data = await response.json();
+        setUsage({
+          "total_extractions": data?.total_extractions || 0,
+          "templates_used": data?.templates_used || 0,
+          "storage_used": data?.storage_used || 0
+        });
+      } catch (err) { console.error("Error fetching usage:", err); }
+      };
+    fetchUsage();
+  }, []);
+
 
   // Client-side filtering of extractions history list
   const filteredHistory = historyItems.filter((item) => {
@@ -594,7 +617,7 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
               <div className="usage-item">
                 <div className="usage-label">
                   <span>Monthly extractions</span>
-                  <span>650 / 1000</span>
+                  <span> {usage.total_extractions} / 1000</span>
                 </div>
                 <div className="progress-bar">
                   <div className="progress blue" style={{ width: "65%" }} />
@@ -604,7 +627,7 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
               <div className="usage-item">
                 <div className="usage-label">
                   <span>Templates used</span>
-                  <span>8 / 20</span>
+                  <span> {usage.templates_used} / 20</span>
                 </div>
                 <div className="progress-bar">
                   <div className="progress green" style={{ width: "40%" }} />
@@ -614,7 +637,7 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
               <div className="usage-item">
                 <div className="usage-label">
                   <span>Storage</span>
-                  <span>2.4 / 5 GB</span>
+                  <span>{usage.storage_used} / 5 GB</span>
                 </div>
                 <div className="progress-bar">
                   <div className="progress amber" style={{ width: "48%" }} />
