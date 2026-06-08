@@ -19,12 +19,36 @@ import {
   Download,
   Trash2,
 } from "lucide-react";
-import { exportToExcel, exportAllToExcel, deletePdf, ReviewView } from "./history";
+import { exportToExcel, exportAllToExcel, ReviewView } from "./history";
 import "./Dashboard.css";
 
 export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], setNotifications }) {
   const [historyItems, setHistoryItems] = useState([]);
   const [reviewItem, setReviewItem] = useState(null);
+  const [deleteItemId, setDeleteItemId] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteItemId) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const response = await fetch(`http://localhost:5000/api/history/delete_pdf/${deleteItemId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to delete record (status ${response.status})`);
+      }
+      setHistoryItems((prev) => prev.filter((item) => item.id !== deleteItemId));
+      setDeleteItemId(null);
+    } catch (err) {
+      console.error("Error deleting record:", err);
+      setDeleteError("Failed to delete record. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
   const [recentPage, setRecentPage] = useState(1);
   const [dashboardMetrics, setDashboardMetrics] = useState({
     totalExtractions: 0,
@@ -37,6 +61,64 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
   const [dateRange, setDateRange] = useState({ type: "all", start: null, end: null, label: "All Time" });
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+
+  // Custom calendar state
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(new Date().getMonth()); // 0-indexed
+  const [activeField, setActiveField] = useState(null); // 'start' or 'end' or null
+
+  // Calendar rendering helpers
+  const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (year, month) => {
+    const day = new Date(year, month, 1).getDay();
+    return day === 0 ? 6 : day - 1; // 0 for Mon, 6 for Sun
+  };
+
+  const calendarDays = [];
+  const daysInMonth = getDaysInMonth(calYear, calMonth);
+  const firstDayIndex = getFirstDayOfMonth(calYear, calMonth);
+
+  for (let i = 0; i < firstDayIndex; i++) {
+    calendarDays.push({ type: "empty", key: `empty-${i}` });
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateString = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    calendarDays.push({ type: "day", dayNum: d, dateStr: dateString, key: dateString });
+  }
+
+  const handlePrevMonth = () => {
+    if (calMonth === 0) {
+      setCalMonth(11);
+      setCalYear((y) => y - 1);
+    } else {
+      setCalMonth((m) => m - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (calMonth === 11) {
+      setCalMonth(0);
+      setCalYear((y) => y + 1);
+    } else {
+      setCalMonth((m) => m + 1);
+    }
+  };
+
+  const isSelectedStart = (dateStr) => customStartDate === dateStr;
+  const isSelectedEnd = (dateStr) => customEndDate === dateStr;
+
+  const formatSummaryDate = (dateStr) => {
+    if (!dateStr) return "";
+    const [y, m, d] = dateStr.split("-");
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
 
   // Status and template filter state
   const [statusFilter, setStatusFilter] = useState("all");
@@ -56,6 +138,20 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
   const dateRef = useRef(null);
   const intervalRef = useRef(null);
   const filterRef = useRef(null);
+
+  // Sync calendar month/year with customStartDate when dropdown opens
+  useEffect(() => {
+    if (showDateDropdown && customStartDate) {
+      const startObj = new Date(customStartDate);
+      if (!isNaN(startObj.getTime())) {
+        setCalYear(startObj.getFullYear());
+        setCalMonth(startObj.getMonth());
+      }
+    }
+    if (!showDateDropdown) {
+      setActiveField(null);
+    }
+  }, [showDateDropdown, customStartDate]);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -345,19 +441,143 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
                   }}>This Month</button>
                   <div className="dropdown-custom-range">
                     <div className="custom-range-title">Custom Range</div>
-                    <form onSubmit={handleCustomDateApply}>
-                      <div className="custom-range-inputs">
-                        <label>
-                          <span>Start:</span>
-                          <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} required />
-                        </label>
-                        <label>
-                          <span>End:</span>
-                          <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} required />
-                        </label>
+                    
+                    <div className="custom-range-fields">
+                      {/* Start Date Field */}
+                      <div className="range-field-group">
+                        <label>Start Date:</label>
+                        <div 
+                          className={`custom-date-input ${activeField === 'start' ? 'active' : ''}`}
+                          onClick={() => setActiveField(activeField === 'start' ? null : 'start')}
+                        >
+                          <span>{customStartDate ? formatSummaryDate(customStartDate) : "Select date"}</span>
+                          <Calendar size={13} className="field-cal-icon" />
+                        </div>
+                        {activeField === 'start' && (
+                          <div className="inline-calendar-wrapper">
+                            <div className="calendar-nav-header">
+                              <button type="button" className="calendar-nav-btn" onClick={handlePrevMonth}>&lt;</button>
+                              <h4>{monthNames[calMonth]} {calYear}</h4>
+                              <button type="button" className="calendar-nav-btn" onClick={handleNextMonth}>&gt;</button>
+                            </div>
+                            <div className="calendar-weekdays">
+                              <div>Mo</div><div>Tu</div><div>We</div><div>Th</div><div>Fr</div><div>Sa</div><div>Su</div>
+                            </div>
+                            <div className="calendar-grid">
+                              {calendarDays.map((cell) => {
+                                if (cell.type === "empty") {
+                                  return <div key={cell.key} className="calendar-day-cell empty" />;
+                                }
+                                const isStart = isSelectedStart(cell.dateStr);
+                                let cellClass = "calendar-day-cell";
+                                if (isStart) cellClass += " selected-start selected-end";
+
+                                return (
+                                  <div
+                                    key={cell.key}
+                                    className={cellClass}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCustomStartDate(cell.dateStr);
+                                      setActiveField(null);
+                                    }}
+                                  >
+                                    {cell.dayNum}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <button type="submit" className="custom-range-btn">Apply Range</button>
-                    </form>
+
+                      {/* End Date Field */}
+                      <div className="range-field-group">
+                        <label>End Date:</label>
+                        <div 
+                          className={`custom-date-input ${activeField === 'end' ? 'active' : ''}`}
+                          onClick={() => setActiveField(activeField === 'end' ? null : 'end')}
+                        >
+                          <span>{customEndDate ? formatSummaryDate(customEndDate) : "Select date"}</span>
+                          <Calendar size={13} className="field-cal-icon" />
+                        </div>
+                        {activeField === 'end' && (
+                          <div className="inline-calendar-wrapper">
+                            <div className="calendar-nav-header">
+                              <button type="button" className="calendar-nav-btn" onClick={handlePrevMonth}>&lt;</button>
+                              <h4>{monthNames[calMonth]} {calYear}</h4>
+                              <button type="button" className="calendar-nav-btn" onClick={handleNextMonth}>&gt;</button>
+                            </div>
+                            <div className="calendar-weekdays">
+                              <div>Mo</div><div>Tu</div><div>We</div><div>Th</div><div>Fr</div><div>Sa</div><div>Su</div>
+                            </div>
+                            <div className="calendar-grid">
+                              {calendarDays.map((cell) => {
+                                if (cell.type === "empty") {
+                                  return <div key={cell.key} className="calendar-day-cell empty" />;
+                                }
+                                const isEnd = isSelectedEnd(cell.dateStr);
+                                let cellClass = "calendar-day-cell";
+                                if (isEnd) cellClass += " selected-start selected-end";
+
+                                return (
+                                  <div
+                                    key={cell.key}
+                                    className={cellClass}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCustomEndDate(cell.dateStr);
+                                      setActiveField(null);
+                                    }}
+                                  >
+                                    {cell.dayNum}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {(customStartDate || customEndDate) && (
+                      <div className="calendar-range-summary" style={{ marginTop: "12px" }}>
+                        <span>
+                          {formatSummaryDate(customStartDate) || "—"}
+                          {" → "}
+                          {formatSummaryDate(customEndDate) || "—"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomStartDate("");
+                            setCustomEndDate("");
+                            setActiveField(null);
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      className="custom-range-btn"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (customStartDate && customEndDate) {
+                          handleCustomDateApply(e);
+                        }
+                      }}
+                      disabled={!customStartDate || !customEndDate}
+                      style={{
+                        opacity: (!customStartDate || !customEndDate) ? 0.5 : 1,
+                        cursor: (!customStartDate || !customEndDate) ? "not-allowed" : "pointer",
+                        marginTop: "12px"
+                      }}
+                    >
+                      Apply Range
+                    </button>
                   </div>
                 </div>
               )}
@@ -522,7 +742,13 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
                             <Download size={13} />
                             <span>Export</span>
                           </button>
-                          <button className="h-btn danger" onClick={() => deletePdf(item.id)}>
+                          <button
+                            className="h-btn danger"
+                            onClick={() => {
+                              setDeleteItemId(item.id);
+                              setDeleteError(null);
+                            }}
+                          >
                             <Trash2 size={13} />
                             <span>Delete</span>
                           </button>
@@ -611,6 +837,35 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
         </div>
         </div>
       </div>
+
+      {deleteItemId && (
+        <div className="delete-modal-backdrop" onClick={() => !isDeleting && setDeleteItemId(null)}>
+          <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="delete-modal-icon">
+              <Trash2 size={24} />
+            </div>
+            <h3>Delete Record</h3>
+            <p>Are you sure you want to delete this record? This action cannot be undone.</p>
+            {deleteError && <div className="delete-modal-error">{deleteError}</div>}
+            <div className="delete-modal-actions">
+              <button
+                className="delete-modal-btn secondary"
+                onClick={() => setDeleteItemId(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="delete-modal-btn danger"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

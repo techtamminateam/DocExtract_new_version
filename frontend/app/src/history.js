@@ -57,6 +57,40 @@ export function exportAllToExcel(items) {
   XLSX.writeFile(wb, "dashboard_extractions_report.xlsx");
 }
 
+export function getTemplateBadgeStyle(name) {
+  const lower = String(name).toLowerCase();
+  if (lower.includes('health') || lower.includes('medical')) return {
+    background: '#e0f2fe',
+    color: '#0369a1',
+    border: '1px solid #bae6fd',
+    fontWeight: '600'
+  };
+  if (lower.includes('financ') || lower.includes('p&l') || lower.includes('invoice')) return {
+    background: '#dcfce7',
+    color: '#15803d',
+    border: '1px solid #bbf7d0',
+    fontWeight: '600'
+  };
+  if (lower.includes('msa') || lower.includes('agreement') || lower.includes('contract')) return {
+    background: '#f3e8ff',
+    color: '#6b21a8',
+    border: '1px solid #e9d5ff',
+    fontWeight: '600'
+  };
+  if (lower.includes('sow') || lower.includes('statement of work')) return {
+    background: '#fef3c7',
+    color: '#b45309',
+    border: '1px solid #fde68a',
+    fontWeight: '600'
+  };
+  return {
+    background: '#f1f5f9',
+    color: '#475569',
+    border: '1px solid #e2e8f0',
+    fontWeight: '600'
+  };
+}
+
 export function deletePdf(id) {
   if (!window.confirm("Are you sure you want to delete this record? This action cannot be undone.")) {
     return;
@@ -160,7 +194,7 @@ export function ReviewView({ item, onBack }) {
             <span className="dv-stat approved">{extractedCount} extracted</span>
             <span className="dv-stat pending">{totalFields - extractedCount} null</span>
             {item.template_name && (
-              <span className="dv-stat" style={{ background: "var(--surface-3, #2a2a3a)", color: "var(--text-dim)" }}>
+              <span className="dv-stat" style={getTemplateBadgeStyle(item.template_name)}>
                 {item.template_name}
               </span>
             )}
@@ -262,6 +296,30 @@ export function ReviewView({ item, onBack }) {
 export function History() {
   const [historyItems, setHistoryItems] = useState([]);
   const [reviewItem, setReviewItem] = useState(null);
+  const [deleteItemId, setDeleteItemId] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteItemId) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const response = await fetch(`http://localhost:5000/api/history/delete_pdf/${deleteItemId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to delete record (status ${response.status})`);
+      }
+      setHistoryItems((prev) => prev.filter((item) => item.id !== deleteItemId));
+      setDeleteItemId(null);
+    } catch (err) {
+      console.error("Error deleting record:", err);
+      setDeleteError("Failed to delete record. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -399,7 +457,10 @@ export function History() {
                           </button>
                           <button
                             className="btn danger"
-                            onClick={() => deletePdf(item.id)}
+                            onClick={() => {
+                              setDeleteItemId(item.id);
+                              setDeleteError(null);
+                            }}
                           >
                             <Trash2 size={13} />
                             <span>Delete</span>
@@ -414,6 +475,35 @@ export function History() {
           </table>
         </div>
       </div>
+
+      {deleteItemId && (
+        <div className="delete-modal-backdrop" onClick={() => !isDeleting && setDeleteItemId(null)}>
+          <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="delete-modal-icon">
+              <Trash2 size={24} />
+            </div>
+            <h3>Delete Record</h3>
+            <p>Are you sure you want to delete this record? This action cannot be undone.</p>
+            {deleteError && <div className="delete-modal-error">{deleteError}</div>}
+            <div className="delete-modal-actions">
+              <button
+                className="delete-modal-btn secondary"
+                onClick={() => setDeleteItemId(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="delete-modal-btn danger"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

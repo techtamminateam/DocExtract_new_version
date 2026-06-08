@@ -1243,19 +1243,15 @@ function NewExtractionUI({
                 {/* Presets */}
                 <div className="de-presets-row">
                   <span className="de-presets-label">QUICK ADD:</span>
-                  {selectedPreset.map((p) => {
-                    const presetIcon = getPresetIcon(p.label);
-                    return (
-                      <button
-                        key={p.field}
-                        className="de-preset-chip-v2"
-                        onClick={() => addPreset(p.field, p.prompt)}
-                      >
-                        <span className="preset-chip-icon">{presetIcon}</span>
-                        {p.label}
-                      </button>
-                    )
-                  })}
+                  {selectedPreset.map((p) => (
+                    <button
+                      key={p.field}
+                      className="de-preset-chip-v2"
+                      onClick={() => addPreset(p.field, p.prompt)}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
                 </div>
 
                 {/* Summary bar */}
@@ -1563,6 +1559,29 @@ function SettingsPage({ activeTab, setActiveTab, notifications, setNotifications
   const [emailError, setEmailError] = useState("");
   const [emailSuccess, setEmailSuccess] = useState("");
 
+  // Team Plan invitation states
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [teamEmails, setTeamEmails] = useState(["", "", "", "", ""]);
+  const [teamModalError, setTeamModalError] = useState("");
+  const [billingSuccessMessage, setBillingSuccessMessage] = useState("");
+
+  const handleConfirmTeamPlan = () => {
+    const filledEmails = teamEmails.filter(email => email.trim() !== "");
+    if (filledEmails.length === 0) {
+      setTeamModalError("Please enter at least one team member email.");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const hasInvalidEmail = filledEmails.some(email => !emailRegex.test(email));
+    if (hasInvalidEmail) {
+      setTeamModalError("Please enter a valid email address for all fields.");
+      return;
+    }
+    setBillingSuccessMessage(`Team Plan selected with ${filledEmails.length} team members: ${filledEmails.join(", ")}`);
+    setShowTeamModal(false);
+    setActiveTab("Billings");
+  };
+
   // Password change states
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -1837,6 +1856,26 @@ function SettingsPage({ activeTab, setActiveTab, notifications, setNotifications
         <div className="settings-main-card">
           {activeTab === "Billings" ? (
             <div className="settings-billing-detail-card">
+              {billingSuccessMessage && (
+                <div className="billing-success-banner" style={{
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  color: '#15803d',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  fontSize: '13.5px',
+                  fontWeight: '500',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>{billingSuccessMessage}</span>
+                </div>
+              )}
               <div className="settings-billing-block">
                 <h2>Payment Method</h2>
                 <p>Update your billing details and address.</p>
@@ -2564,7 +2603,12 @@ function SettingsPage({ activeTab, setActiveTab, notifications, setNotifications
                     <p>Your team processing partner. Unlock instant, world-class workflow with a simple monthly fee.</p>
                     <div className="subscription-card-price">$12.00 <span>/Month</span></div>
                   </div>
-                  <button className="subscription-card-btn btn-team" onClick={() => setActiveTab("Billings")}>
+                  <button className="subscription-card-btn btn-team" onClick={() => {
+                    setTeamEmails(["", "", "", "", ""]);
+                    setTeamModalError("");
+                    setBillingSuccessMessage("");
+                    setShowTeamModal(true);
+                  }}>
                     <span>Get Team Plan</span>
                     <ChevronRight size={14} />
                   </button>
@@ -2603,6 +2647,54 @@ function SettingsPage({ activeTab, setActiveTab, notifications, setNotifications
           )}
         </div>
       </div>
+      {showTeamModal && (
+        <div className="team-plan-modal-backdrop" onClick={() => setShowTeamModal(false)}>
+          <div className="team-plan-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="team-modal-header">
+              <div>
+                <h2>Set up your Team Plan</h2>
+                <p>Add email addresses of up to 5 team members to share this plan.</p>
+              </div>
+              <button className="team-modal-close" onClick={() => setShowTeamModal(false)}>×</button>
+            </div>
+            
+            {teamModalError && (
+              <div className="team-modal-error">
+                <span>{teamModalError}</span>
+              </div>
+            )}
+
+            <div className="team-modal-inputs">
+              {teamEmails.map((email, idx) => (
+                <div key={idx} className="team-email-input-row">
+                  <span className="team-email-label">User {idx + 1}</span>
+                  <input
+                    type="email"
+                    className="team-email-field"
+                    placeholder={`Enter email address (e.g. member${idx + 1}@company.com)`}
+                    value={email}
+                    onChange={(e) => {
+                      const updated = [...teamEmails];
+                      updated[idx] = e.target.value;
+                      setTeamEmails(updated);
+                      setTeamModalError("");
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="team-modal-footer">
+              <button className="team-modal-btn cancel" onClick={() => setShowTeamModal(false)}>
+                Cancel
+              </button>
+              <button className="team-modal-btn confirm" onClick={handleConfirmTeamPlan}>
+                Save & Continue to Billing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3169,40 +3261,57 @@ export default function DocExtract() {
   const [activeNav, setActiveNav] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [settingsTab, setSettingsTab] = useState("Billings");
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: "Extraction Successful",
-      description: "medical_field.pdf was processed and 4/4 fields were extracted.",
-      time: "2 hours ago",
-      unread: true,
-      type: "success"
-    },
-    {
-      id: 2,
-      title: "Review Required",
-      description: "invoice_9918.pdf contains 2 fields flagged with low confidence scores.",
-      time: "5 hours ago",
-      unread: true,
-      type: "warning"
-    },
-    {
-      id: 3,
-      title: "Storage Warning",
-      description: "Your workspace has used 65% of the allocated storage limit.",
-      time: "1 day ago",
-      unread: false,
-      type: "info"
-    },
-    {
-      id: 4,
-      title: "Integrations Reconnected",
-      description: "Google Drive account was successfully reconnected by Alex Johnson.",
-      time: "2 days ago",
-      unread: false,
-      type: "success"
+  const [notifications, setNotifications] = useState(() => {
+    const defaultNotifs = [
+      {
+        id: 1,
+        title: "Extraction Successful",
+        description: "medical_field.pdf was processed and 4/4 fields were extracted.",
+        time: "2 hours ago",
+        unread: true,
+        type: "success"
+      },
+      {
+        id: 2,
+        title: "Review Required",
+        description: "invoice_9918.pdf contains 2 fields flagged with low confidence scores.",
+        time: "5 hours ago",
+        unread: true,
+        type: "warning"
+      },
+      {
+        id: 3,
+        title: "Storage Warning",
+        description: "Your workspace has used 65% of the allocated storage limit.",
+        time: "1 day ago",
+        unread: false,
+        type: "info"
+      },
+      {
+        id: 4,
+        title: "Integrations Reconnected",
+        description: "Google Drive account was successfully reconnected by Alex Johnson.",
+        time: "2 days ago",
+        unread: false,
+        type: "success"
+      }
+    ];
+    try {
+      const saved = localStorage.getItem("docextract_notifications");
+      return saved ? JSON.parse(saved) : defaultNotifs;
+    } catch (e) {
+      console.error("Failed to load notifications from localStorage:", e);
+      return defaultNotifs;
     }
-  ]);
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("docextract_notifications", JSON.stringify(notifications));
+    } catch (e) {
+      console.error("Failed to save notifications to localStorage:", e);
+    }
+  }, [notifications]);
   const [verifyMode, setVerifyMode] = useState(false);
   const [verifiedFields, setVerifiedFields] = useState({}); // { fieldKey: "approved"|"flagged"|"pending" }
   const [editedResult, setEditedResult] = useState({});     // { fieldKey: editedValue }
