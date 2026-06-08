@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import "./integration.css";
+import { API_URL } from "./apiService";
 
 // ─── Constants ───────────────────────────────────────────────
-const BACKEND_URL = "http://localhost:5000/api";
+const BACKEND_URL = `${API_URL}`;
 
 const PROVIDERS = {
   google: {

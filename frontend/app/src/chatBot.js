@@ -10,6 +10,8 @@ import {
   Zap,
 } from "lucide-react";
 import "./chatBot.css";
+import { API_URL } from "./apiService";
+
 
 const QUICK_PROMPTS = [
   { label: "Invoice", icon: <FileText size={12} />, msg: "How does Invoice Checking work?" },
@@ -17,7 +19,7 @@ const QUICK_PROMPTS = [
   { label: "Workflow", icon: <HelpCircle size={12} />, msg: "How do I extract data from a PDF?" },
 ];
 
-const BACKEND_URL = "http://localhost:5000/api/chat";
+const BACKEND_URL = `${API_URL}/chat`;
 
 function renderMarkdown(text) {
   return text

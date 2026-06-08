@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { FileText, Clock, Eye, Download, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./history.css";
+import {API_URL} from "./apiService"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ export function deletePdf(id) {
     return;
   }
 
-  fetch(`http://localhost:5000/api/history/delete_pdf/${id}`, {
+  fetch(`${API_URL}/history/delete_pdf/${id}`, {
     method: "DELETE",
   })
     .then((res) => {
@@ -112,8 +113,8 @@ export function ReviewView({ item, onBack }) {
     setBlobUrl(null);
 
     const endpoint = isPdf
-      ? `http://localhost:5000/api/pdf/${encodeURIComponent(fileName)}`
-      : `http://localhost:5000/api/file/${encodeURIComponent(fileName)}`;
+      ? `${API_URL}/pdf/${encodeURIComponent(fileName)}`
+      : `${API_URL}/file/${encodeURIComponent(fileName)}`;
 
     fetch(endpoint)
       .then((res) => {
@@ -358,7 +359,7 @@ export function History() {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/history");
+        const response = await fetch(`${API_URL}/history`);
         if (!response.ok) throw new Error("Failed to fetch history");
         const data = await response.json();
         setHistoryItems(data.history || []);

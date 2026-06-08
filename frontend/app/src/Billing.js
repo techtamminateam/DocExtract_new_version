@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import "./DocExtract.css";
+import { API_URL } from "./apiService";
 
 
-const API = "http://localhost:5000/api";
+const API = API_URL;
 
 // Load Razorpay script dynamically
 function loadRazorpayScript() {

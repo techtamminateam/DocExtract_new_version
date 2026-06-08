@@ -46,8 +46,9 @@ import {
   XCircle,
 } from 'lucide-react';
 import './Profile.css';
+import { API_URL } from './apiService';
 
-const API_URL = "http://localhost:5000/api";
+const api_url = API_URL;
 const heroStats = [
   { label: 'Documents Processed', value: 12458, suffix: '', tone: 'blue' },
   { label: 'Extraction Accuracy', value: 99.4, suffix: '%', tone: 'green' },
@@ -323,7 +324,7 @@ export function Profile() {
     const fecthStats = async () => {
       try {
         const userId = localStorage.getItem("id");
-        const response = await fetch(`${API_URL}/profile/stats/${userId}`);
+        const response = await fetch(`${api_url}/profile/stats/${userId}`);
         if (!response.ok) {
           throw new Error("Failed to fetch stats");
         }
@@ -347,7 +348,7 @@ export function Profile() {
         const userId = localStorage.getItem("id");
         if (!userId) return;
 
-        const response = await fetch(`${API_URL}/profile/${userId}`);
+        const response = await fetch(`${api_url}/profile/${userId}`);
         const result = await response.json();
 
         if (!response.ok) throw new Error(result.error || "Failed to load profile");
@@ -392,7 +393,7 @@ const [profileErrors, setProfileErrors] = useState({});
 
       const userId = localStorage.getItem("id");
 
-      const response = await fetch(`${API_URL}/profile/update`, {
+      const response = await fetch(`${api_url}/profile/update`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
