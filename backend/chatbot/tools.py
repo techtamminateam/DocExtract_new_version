@@ -63,7 +63,7 @@ def get_recent_extraction_records(limit: int = 5) -> str:
     for record in records:
         record_list.append({
             "template_name": record.template_name,
-            "pdf_filename": record.pdf_filename,
+            "file_name": record.file_name,
             "timestamp": record.timestamp.isoformat(),
             "data_points": record.data_points
         })
@@ -82,25 +82,25 @@ def get_extraction_records_by_date_range(start_date: str, end_date: str) -> str:
     for record in records:
         record_list.append({
             "template_name": record.template_name,
-            "pdf_filename": record.pdf_filename,
+            "file_name": record.file_name,
             "timestamp": record.timestamp.isoformat(),
             "data_points": record.data_points
         })
     return json.dumps(record_list)
 
 @tool
-def get_extraction_record_by_filename(pdf_filename: str) -> str:
+def get_extraction_record_by_filename(file_name: str) -> str:
     """
     Get extraction record by PDF filename.
     Returns the extraction record with template name, timestamp, and data points.
     """
-    record = ExtractionRecord.query.filter_by(pdf_filename=pdf_filename).first()
+    record = ExtractionRecord.query.filter_by(file_name=file_name).first()
     if not record:
         return json.dumps({"error": "Record not found"})
     
     return json.dumps({
         "template_name": record.template_name,
-        "pdf_filename": record.pdf_filename,
+        "file_name": record.file_name,
         "timestamp": record.timestamp.isoformat(),
         "data_points": record.data_points
     })
@@ -117,7 +117,7 @@ def get_extraction_result(extraction_id: int) -> str:
     
     return json.dumps({
         "template_name": record.template_name,
-        "pdf_filename": record.pdf_filename,
+        "file_name": record.file_name,
         "timestamp": record.timestamp.isoformat(),
         "data_points": record.data_points,
         "results": record.results
@@ -163,7 +163,7 @@ def get_extraction_by_template(template_name: str) -> str:
     for record in records:
         record_list.append({
             "template_name": record.template_name,
-            "pdf_filename": record.pdf_filename,
+            "file_name": record.file_name,
             "timestamp": record.timestamp.isoformat(),
             "data_points": record.data_points
         })

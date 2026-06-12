@@ -619,7 +619,6 @@
 
 .progress {
   height: 100%;
-  background: var(--primary);
   border-radius: 999px;
 
 }

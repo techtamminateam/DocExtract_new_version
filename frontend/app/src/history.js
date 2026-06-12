@@ -31,7 +31,7 @@ export function exportToExcel(item) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Extracted Data");
 
-  const filename = `${(item.pdf_filename || "extraction").replace(/\.pdf$/i, "")}_results.xlsx`;
+  const filename = `${(item.file_name || "extraction").replace(/\.pdf$/i, "")}_results.xlsx`;
   XLSX.writeFile(wb, filename);
 }
 
@@ -43,7 +43,7 @@ export function exportAllToExcel(items) {
       .map(([k, v]) => `${k}: ${Array.isArray(v) || typeof v === "object" ? JSON.stringify(v) : v}`)
       .join("\n");
     return {
-      "File Name": item.pdf_filename || "Untitled",
+      "File Name": item.file_name || "Untitled",
       "Template Name": item.template_name || "N/A",
       "Date Extracted": item.timestamp ? new Date(item.timestamp).toLocaleString() : "N/A",
       "Total Fields": item.data_points?.length || 0,
@@ -91,7 +91,7 @@ export function ReviewView({ item, onBack }) {
   const totalFields = entries.length;
   const extractedCount = entries.filter(([, v]) => v !== null && v !== undefined).length;
 
-  const fileName = item.file_name || item.pdf_filename || "";
+  const fileName = item.file_name || item.file_name || "";
   const lowerFileName = fileName.toLowerCase();
   const isPdf = lowerFileName.endsWith(".pdf");
   const isImage = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"].some((ext) =>
@@ -418,7 +418,7 @@ export function History() {
                         <div className="doc-info">
                           <FileText className="doc-icon" />
                           <span className="doc-name">
-                            {item.pdf_filename || "Untitled"}
+                            {item.file_name || "Untitled"}
                           </span>
                         </div>
                       </td>

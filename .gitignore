@@ -10,8 +10,12 @@ backend/venv/
 .env
 backend/.env
 
+backend/flask_sessions/
+
+
 # Logs
 logs/
+
 
 # Uploaded files
 backend/uploads/

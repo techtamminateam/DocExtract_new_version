@@ -22,7 +22,7 @@ def history():
                 {
                     "id": r.id,
                     "timestamp": r.timestamp.isoformat() if r.timestamp else None,
-                    "pdf_filename": r.pdf_filename,
+                    "file_name": r.file_name,
                     "template_name": r.template_name,
                     "data_points": r.data_points,
                     "results": r.results
@@ -42,8 +42,8 @@ def delete_pdf(id):
         if not record:
             return jsonify({"error": "Record not found"}), 404
 
-        pdf_path = os.path.join(current_app.config["UPLOAD_FOLDER"], record.pdf_filename)
-        if record.pdf_filename and os.path.exists(pdf_path):
+        pdf_path = os.path.join(current_app.config["UPLOAD_FOLDER"], record.file_name)
+        if record.file_name and os.path.exists(pdf_path):
             os.remove(pdf_path)
 
         ExtractionRecord.query.filter_by(id=id).delete()
@@ -65,7 +65,7 @@ def delete_document(id):
             return jsonify({"error": "Record not found"}), 404
 
         doc = Document.query.filter_by(document_id=id).first()
-        file_name = doc.filename if doc and doc.filename else record.pdf_filename
+        file_name = doc.filename if doc and doc.filename else record.file_name
 
         if file_name:
             file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], file_name)

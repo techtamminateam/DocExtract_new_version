@@ -8,7 +8,7 @@ import { Integration } from "./integration";
 import { Profile } from "./Profile";
 import BillingSettings from "./Billing";
 
-const BACKEND_URL = "http://localhost:5000/api";
+const BACKEND_URL = "/api";
 
 
 
@@ -2555,7 +2555,7 @@ function TemplateEditor({ templateId, onBack, onUseTemplate, initialTab = "overv
       setLoading(true);
       setError("");
       try {
-        const response = await fetch(`http://127.0.0.1:5000/api/templates/${templateId}`);
+        const response = await fetch(`${BACKEND_URL}/templates/${templateId}`);
         if (!response.ok) throw new Error(`Failed to fetch template (${response.status})`);
         const data = await response.json();
         if (isMounted) {
@@ -2579,8 +2579,8 @@ function TemplateEditor({ templateId, onBack, onUseTemplate, initialTab = "overv
     setError("");
     try {
       const url = templateId === 'new' 
-        ? `http://127.0.0.1:5000/api/templates` 
-        : `http://127.0.0.1:5000/api/templates/${templateId}`;
+        ? `${BACKEND_URL}/templates` 
+        : `${BACKEND_URL}/templates/${templateId}`;
       
       const method = templateId === 'new' ? "POST" : "PUT";
 
@@ -2839,7 +2839,7 @@ function TemplatesPage({ onUseTemplate }) {
       setLoadingTemplates(true);
       setTemplatesError("");
       try {
-        const response = await fetch("http://127.0.0.1:5000/api/templates");
+        const response = await fetch(`${BACKEND_URL}/templates`);
         if (!response.ok) {
           throw new Error(`Failed to fetch templates (${response.status})`);
         }
@@ -2869,7 +2869,7 @@ function TemplatesPage({ onUseTemplate }) {
     }
 
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/templates/${templateId}`, {
+      const response = await fetch(`${BACKEND_URL}/templates/${templateId}`, {
         method: "DELETE",
       });
 
@@ -3061,6 +3061,8 @@ function TemplatesPage({ onUseTemplate }) {
 
 // ── COMPONENT ─────────────────────────────────────────────────────────────────
 export default function DocExtract({ onLogout }) {
+  const SETTINGS_TAB_STORAGE_KEY = "de-settingsTab:settings";
+
   // State
   const [files, setFiles] = useState([]);           // multi-file array
   const [dataPoints, setDataPoints] = useState([]);
@@ -3076,9 +3078,14 @@ export default function DocExtract({ onLogout }) {
   const [copiedJSON, setCopiedJSON] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState([]);
   const [preset, setPreset] = useState("");
-  const [activeNav, setActiveNav] = useState("dashboard");
+  const [activeNav, setActiveNav] = useState(() => localStorage.getItem("de-activeNav") || "dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [settingsTab, setSettingsTab] = useState("Billings");
+  const [settingsTab, setSettingsTab] = useState(() => localStorage.getItem(SETTINGS_TAB_STORAGE_KEY) || "Billings");
+  const [usage, setUsage] = useState({
+    total_extractions: 0,
+    templates_used: 0,
+    storage_used: 0,
+  });
   const [notifications, setNotifications] = useState([
     {
       id: 1,
@@ -3141,6 +3148,33 @@ export default function DocExtract({ onLogout }) {
     // Clear results when file or data points change
     setSelectedPreset(PRESETS_POLICY_CHECKING);
 
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("de-activeNav", activeNav);
+  }, [activeNav]);
+
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, settingsTab);
+  }, [settingsTab]);
+
+  useEffect(() => {
+    const fetchUsage = async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/history/usage`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setUsage({
+          total_extractions: Number(data?.total_extractions || 0),
+          templates_used: Number(data?.templates_used || 0),
+          storage_used: Number(data?.storage_used || 0),
+        });
+      } catch {
+        // Keep the default usage values if the API is unavailable.
+      }
+    };
+
+    fetchUsage();
   }, []);
  
   const fileInputRef = useRef(null);
@@ -3473,7 +3507,7 @@ export default function DocExtract({ onLogout }) {
 
       let resp;
       try {
-        resp = await fetch("http://localhost:5000/api/extract", { method: "POST", body: fd });
+        resp = await fetch(`${BACKEND_URL}/extract`, { method: "POST", body: fd });
       } catch (fetchErr) {
         throw new Error(`Network error: ${fetchErr.message}. Is the backend running on localhost:5000?`);
       }
@@ -3598,7 +3632,7 @@ export default function DocExtract({ onLogout }) {
         };
       });
 
-      const res = await fetch("http://localhost:5000/api/save_result_status", {
+      const res = await fetch(`${BACKEND_URL}/save_result_status`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -3788,9 +3822,14 @@ export default function DocExtract({ onLogout }) {
             <div className="de-sb-usage">
               <div className="de-sb-usage-label">USAGE</div>
               <div className="de-sb-usage-bar-wrap">
-                <div className="de-sb-usage-bar" style={{ width: "65%" }} />
+                <div
+                  className="de-sb-usage-bar"
+                  style={{ width: `${Math.min(100, (usage.total_extractions / 1000) * 100)}%` }}
+                />
               </div>
-              <div className="de-sb-usage-text">650 / 1000 Extractions left</div>
+              <div className="de-sb-usage-text">
+                {usage.total_extractions.toLocaleString()} / 1000 Extractions used
+              </div>
             </div>
           )}
 

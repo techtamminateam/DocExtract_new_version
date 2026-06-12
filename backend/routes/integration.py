@@ -7,10 +7,31 @@ import requests
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 import os
+import json
+import pathlib
+import tempfile
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# ── State stored in a temp file (avoids cookie/session issues during OAuth redirect) ──
+STATE_FILE = pathlib.Path(tempfile.gettempdir()) / "oauth_state.json"
+
+def save_state(state):
+    STATE_FILE.write_text(json.dumps({"state": state}))
+
+def load_state():
+    try:
+        return json.loads(STATE_FILE.read_text()).get("state")
+    except Exception:
+        return None
+
+def clear_state():
+    try:
+        STATE_FILE.unlink()
+    except Exception:
+        pass
 
 integration_bp = Blueprint("integration_bp", __name__)
 
@@ -49,7 +70,9 @@ def get_drive_credentials():
 @integration_bp.route("/auth/google")
 def auth_google():
     state = secrets.token_urlsafe(16)
-    session["oauth_state"] = state
+    save_state(state)  # store in temp file — immune to cookie/session issues
+    print(">>> SET state:", state)
+    print(">>> Saved to:", STATE_FILE)
 
     params = {
         "client_id": CLIENT_ID,
@@ -70,47 +93,41 @@ def auth_google():
 def auth_callback():
     code = request.args.get("code")
     state = request.args.get("state")
+    expected = load_state()
 
-    # 🔐 Validate state
-    if state != session.get("oauth_state"):
-        return jsonify({"error": "Invalid state"}), 400
+    print(">>> GOT state from Google:", state)
+    print(">>> Expected state from file:", expected)
 
-    token_url = "https://oauth2.googleapis.com/token"
+    if not expected or state != expected:
+        return jsonify({"error": "Invalid state", "got": state, "expected": expected}), 400
 
-    data = {
+    clear_state()
+
+    token_response = requests.post("https://oauth2.googleapis.com/token", data={
         "code": code,
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
         "redirect_uri": REDIRECT_URI,
         "grant_type": "authorization_code"
-    }
+    }).json()
 
-    token_response = requests.post(token_url, data=data).json()
-
-    # ✅ Store tokens in session
     session["access_token"] = token_response.get("access_token")
     session["refresh_token"] = token_response.get("refresh_token")
+    session.modified = True
 
-    # Fetch Google profile info
-    user_res = requests.get(
+    user_data = requests.get(
         "https://www.googleapis.com/oauth2/v2/userinfo",
-        headers={
-            "Authorization": f"Bearer {session['access_token']}"
-        }
-    )
+        headers={"Authorization": f"Bearer {session['access_token']}"}
+    ).json()
 
-    user_data = user_res.json()
-
-    # Store user in session
     session["user"] = {
         "name": user_data.get("name"),
         "email": user_data.get("email"),
         "picture": user_data.get("picture"),
     }
+    session.modified = True
 
-    # redirect back to React app
-    return redirect("http://localhost:3000")
-
+    return redirect("http://localhost:5000")
 
 # 📊 Step 3: Check connection
 @integration_bp.route("/auth/status")

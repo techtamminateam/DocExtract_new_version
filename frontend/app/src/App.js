@@ -14,10 +14,21 @@ function App() {
       } catch {
         localStorage.removeItem('loggedInUser');
       }
+      return;
+    }
+
+    const savedId = localStorage.getItem('id');
+    const savedEmail = localStorage.getItem('email');
+
+    if (savedId && savedEmail) {
+      const restoredUser = { id: savedId, email: savedEmail };
+      localStorage.setItem('loggedInUser', JSON.stringify(restoredUser));
+      setCurrentUser(restoredUser);
     }
   }, []);
 
   const handleLoginSuccess = (user) => {
+    localStorage.setItem('loggedInUser', JSON.stringify(user));
     setCurrentUser(user);
   };
 

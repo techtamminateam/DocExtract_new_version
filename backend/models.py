@@ -11,7 +11,7 @@ class ExtractionRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     template_name = db.Column(db.String(255), nullable=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    pdf_filename = db.Column(db.String(255))
+    file_name = db.Column(db.String(255))
     data_points = db.Column(db.JSON, nullable=False)
     results = db.Column(db.JSON, nullable=True)
     result_status = db.Column(db.JSON, nullable=False)

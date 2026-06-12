@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { exportToExcel, exportAllToExcel, deletePdf, ReviewView } from "./history";
 import "./Dashboard.css";
+import { API_URL } from "./apiService";
 
 export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], setNotifications }) {
   const [historyItems, setHistoryItems] = useState([]);
@@ -72,7 +73,7 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
       const userId = localStorage.getItem("id");
 
       try {
-        const response = await fetch(`http://127.0.0.1:5000/api/profile/${userId}`);
+        const response = await fetch(`${API_URL}/profile/${userId}`);
         if (!response.ok) throw new Error("Failed to fetch profile");
         const result = await response.json();
         setProfileForm({
@@ -92,7 +93,7 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/history");
+        const response = await fetch(`${API_URL}/history`);
         if (!response.ok) throw new Error("Failed to fetch history");
         const data = await response.json();
         setHistoryItems(data.history || []);
@@ -106,7 +107,7 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
   useEffect(() => {
     const fetchDashboardMetrics = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:5000/api/result_status");
+        const response = await fetch(`${API_URL}/result_status`);
         if (!response.ok) throw new Error("Failed to fetch dashboard metrics");
         const data = await response.json();
         const statusCount = data?.status_count || {};
@@ -129,7 +130,7 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
   useEffect(() => {
     const fetchUsage = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:5000/api/history/usage");
+        const response = await fetch(`${API_URL}/history/usage`);
         if (!response.ok) throw new Error("Failed to fetch usage");
         const data = await response.json();
         setUsage({
@@ -541,7 +542,7 @@ export function Dashboard({ setActiveNav, setSettingsTab, notifications = [], se
                       <FileText size={15} />
 
                       <div className="recent-info">
-                        <div className="recent-name">{item.pdf_filename || "Untitled"}</div>
+                        <div className="recent-name">{item.file_name || "Untitled"}</div>
                         <div className="recent-meta">
                           {item.template_name || "N/A"} · {item.timestamp
                             ? new Date(item.timestamp).toLocaleString("en-US", {

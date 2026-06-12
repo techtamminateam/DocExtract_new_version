@@ -424,6 +424,11 @@ const AIExtracterLanding = ({ onLoginSuccess }) => {
       return;
     }
 
+    if (!accountData.password.trim()) {
+      setErrors({ password: "Password is required before sending a code" });
+      return;
+    }
+
     setIsSendingCode(true);
     setErrors({});
 

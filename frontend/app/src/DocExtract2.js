@@ -6,7 +6,7 @@ import { History } from "./history";
 import { Dashboard } from "./Dashboard";
 import { Integration } from "./integration";
 
-const BACKEND_URL = "http://localhost:5000/api";
+const BACKEND_URL = "/api";
 
 
 
@@ -1593,7 +1593,7 @@ function TemplatesPage({ onUseTemplate }) {
       setLoadingTemplates(true);
       setTemplatesError("");
       try {
-        const response = await fetch("http://127.0.0.1:5000/api/templates");
+        const response = await fetch(`${BACKEND_URL}/templates`);
         if (!response.ok) {
           throw new Error(`Failed to fetch templates (${response.status})`);
         }
@@ -1744,6 +1744,11 @@ export default function DocExtract() {
   const [preset, setPreset] = useState("");
   const [activeNav, setActiveNav] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [usage, setUsage] = useState({
+    total_extractions: 0,
+    templates_used: 0,
+    storage_used: 0,
+  });
   const [verifyMode, setVerifyMode] = useState(false);
   const [verifiedFields, setVerifiedFields] = useState({}); // { fieldKey: "approved"|"flagged"|"pending" }
   const [editedResult, setEditedResult] = useState({});     // { fieldKey: editedValue }
@@ -1761,6 +1766,25 @@ export default function DocExtract() {
   useEffect(() => {
     // Clear results when file or data points change
     setSelectedPreset(PRESETS_POLICY_CHECKING);
+  }, []);
+
+  useEffect(() => {
+    const fetchUsage = async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/history/usage`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setUsage({
+          total_extractions: Number(data?.total_extractions || 0),
+          templates_used: Number(data?.templates_used || 0),
+          storage_used: Number(data?.storage_used || 0),
+        });
+      } catch {
+        // Keep the default usage values if the API is unavailable.
+      }
+    };
+
+    fetchUsage();
   }, []);
 
   const fileInputRef = useRef(null);
@@ -1982,7 +2006,7 @@ export default function DocExtract() {
 
       let resp;
       try {
-        resp = await fetch("http://localhost:5000/api/extract", { method: "POST", body: fd });
+        resp = await fetch(`${BACKEND_URL}/extract`, { method: "POST", body: fd });
       } catch (fetchErr) {
         throw new Error(`Network error: ${fetchErr.message}. Is the backend running on localhost:5000?`);
       }
@@ -2079,7 +2103,7 @@ export default function DocExtract() {
         out: out,
       };
 
-      const res = await fetch("http://localhost:5000/api/save_result_status", {
+      const res = await fetch(`${BACKEND_URL}/save_result_status`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2249,9 +2273,14 @@ export default function DocExtract() {
             <div className="de-sb-usage">
               <div className="de-sb-usage-label">USAGE</div>
               <div className="de-sb-usage-bar-wrap">
-                <div className="de-sb-usage-bar" style={{ width: "65%" }} />
+                <div
+                  className="de-sb-usage-bar"
+                  style={{ width: `${Math.min(100, (usage.total_extractions / 1000) * 100)}%` }}
+                />
               </div>
-              <div className="de-sb-usage-text">650 / 1000 Extractions left</div>
+              <div className="de-sb-usage-text">
+                {usage.total_extractions.toLocaleString()} / 1000 Extractions used
+              </div>
             </div>
           )}
         </div>

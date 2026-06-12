@@ -1,5 +1,6 @@
 // apiService.js
-const API_URL = "http://localhost:5000/api"
+// Use same-origin API path so backend-served frontend talks to the backend
+const API_URL = "/api"
 
 console.log("Using API URL:", API_URL);
 

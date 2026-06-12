@@ -22,6 +22,7 @@ from flask_sqlalchemy import SQLAlchemy
 from config import Config, UploadConfig, MailConfig
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
+from dotenv import load_dotenv
 from ppp import extract_text_from_file, extract_text_from_image
 
 from models import (
@@ -54,14 +55,23 @@ mail = Mail()
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-app = Flask(__name__)
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+# Path to the React production build directory (frontend/app/build)
+FRONTEND_BUILD_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend", "app", "build"))
+if not os.path.isdir(FRONTEND_BUILD_DIR):
+    FRONTEND_BUILD_DIR = None
+
+# Serve frontend build as Flask static files so only the backend process is needed
+app = Flask(__name__, static_folder=FRONTEND_BUILD_DIR, static_url_path="")
 # Load configs FIRST
+load_dotenv()
 app.config.from_object(Config)
 app.config.from_object(UploadConfig)
 app.config.from_object(MailConfig)
 
 # Secret keys
-app.secret_key = "nvjkfdskjgbvabjgsdsbsggbui"
+app.secret_key = os.getenv("SECRET_KEY")
+
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 
 # Initialize extensions
@@ -72,7 +82,12 @@ jwt = JWTManager(app)
 bcrypt = Bcrypt(app)
 
 # CORS
-CORS(app, supports_credentials=True)
+CORS(app, 
+     supports_credentials=True, 
+     origins=["http://localhost:5000"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     allow_headers=["Content-Type", "Authorization"]
+)
 
 app.register_blueprint(history_bp, url_prefix="/api")
 app.register_blueprint(result_status_bp, url_prefix="/api")
@@ -502,7 +517,7 @@ def extract():
                 timestamp = datetime.now()
 
                 extraction_record = ExtractionRecord(
-                    pdf_filename=uploaded_file.filename,
+                    file_name=uploaded_file.filename,
                     data_points=data_points,
                     results=results,
                     template_name=template_name,
@@ -623,19 +638,19 @@ def save_result_status():
     try:
         data = request.get_json()
 
-        pdf_filename = data.get("file_name", "")
+        file_name = data.get("file_name", "")
         result_status = data.get("out", {})
 
-        if not pdf_filename:
+        if not file_name:
             raise ValueError("file_name is required")
         if not isinstance(result_status, dict):
             raise ValueError("result_status must be a JSON object")
 
         isPdfExits = ExtractionRecord.query.filter_by(
-            pdf_filename=pdf_filename
+            file_name=file_name
         ).first()
         message = "Saving new result status" if not isPdfExits else "Updated to existing result status"
-        logger.info(f"{message} for PDF: {pdf_filename}")
+        logger.info(f"{message} for PDF: {file_name}")
         if not isPdfExits:
             status_record = ExtractionRecord(
                 result_status=result_status
@@ -657,6 +672,23 @@ def save_result_status():
             "status": "error",
             "message": str(exc)
         }), 500
+
+
+# Serve frontend static files (production build). If the build is missing,
+# return a helpful JSON response so the operator knows to run `npm run build`.
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_frontend(path: str):
+    if app.static_folder:
+        requested_path = os.path.join(app.static_folder, path)
+        if path and os.path.exists(requested_path) and os.path.isfile(requested_path):
+            return send_from_directory(app.static_folder, path)
+        index_path = os.path.join(app.static_folder, "index.html")
+        if os.path.exists(index_path):
+            return send_from_directory(app.static_folder, "index.html")
+    return jsonify({
+        "error": "Frontend build not found. Run 'npm run build' in frontend/app and restart the backend." 
+    }), 404
 
 if __name__ == "__main__":
     # threaded=True lets Flask handle concurrent requests (each request gets its own thread)
