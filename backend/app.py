@@ -465,7 +465,7 @@ def process_file_background(app, record_id, file_path, data_points,
 
             # Done
             result_status = {
-                field["field"]: {"status": "pending", "value": None}
+                field["field"]: {"status": "pending"}
                 for field in data_points
             }
             extraction_record.results = results
@@ -507,7 +507,7 @@ def process_file_background(app, record_id, file_path, data_points,
                 os.unlink(tmp_path)
             except OSError:
                 pass
-            
+
 @app.route("/api/extract", methods=["POST"])
 def extract():
     uploaded_files = request.files.getlist("file")
@@ -577,6 +577,22 @@ def extract():
         "record_id": record_ids[0] if record_ids else None  # convenience for single file
     })
 
+@app.route("/api/extraction-result/<int:record_id>")
+def extraction_result(record_id):
+    record = ExtractionRecord.query.get(record_id)
+    if not record:
+        return jsonify({"error": "Record not found"}), 404
+
+    if record.processing_status != "completed":
+        return jsonify({"error": "Not ready yet", "status": record.processing_status}), 202
+
+    return jsonify({
+        "status": "completed",
+        "filename": record.file_name,
+        "results": record.results,           # the extracted fields dict
+        "result_status": record.result_status,
+        "timestamp": str(record.timestamp)
+    })
 
 @app.route("/api/extraction-status/<int:record_id>")
 def extraction_status(record_id):
@@ -591,6 +607,7 @@ def extraction_status(record_id):
         "progress": record.progress,
         "message": record.processing_message
     })
+
 
 @app.route("/api/health", methods=["GET"])
 def health():
