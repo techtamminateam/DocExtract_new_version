@@ -403,6 +403,111 @@ def get_template(template_name):
 
 
 # ── /api/extract ──────────────────────────────────────────────────────────────
+# app.py — replace your /api/extract route
+
+import threading
+def process_file_background(app, record_id, file_path, data_points, 
+                             template_name, filename, user_id_raw, source_type, file_type):
+    """Runs in a background thread. Uses app context for DB access."""
+    with app.app_context():
+        extraction_record = ExtractionRecord.query.get(record_id)
+        suffix = os.path.splitext(filename)[1] or ""
+
+        try:
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                with open(file_path, "rb") as f:
+                    tmp.write(f.read())
+                tmp_path = tmp.name
+
+            p = get_pipeline()
+            ppp_mod = p["ppp"]
+            gemini_model = p["gemini_model"]
+            encoding = p["encoding"]
+
+            # Stage 1 — extract text
+            extraction_record.processing_status = "extracting_text"
+            extraction_record.progress = 20
+            extraction_record.processing_message = "Extracting text from file"
+            db.session.commit()
+
+            large_text = text_extract_parallel(tmp_path)
+
+            extraction_record.processing_status = "text_extracted"
+            extraction_record.progress = 50
+            extraction_record.processing_message = "Text extracted from file"
+            db.session.commit()
+
+            # Stage 2 — vectorstore if large
+            pdf_tokens = len(encoding.encode(large_text))
+            if pdf_tokens > 40000:
+                extraction_record.processing_status = "vectorstore_created"
+                extraction_record.progress = 70
+                extraction_record.processing_message = "Building vectorstore for large document"
+                db.session.commit()
+
+                texts = ppp_mod.split_text(large_text, 4000, buffer=400)
+                vectorstore = ppp_mod.create_vectorstore(texts)
+                retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+                field_parts = [dp["field"] for dp in data_points]
+                docs = retriever.get_relevant_documents(" ".join(field_parts)[:1500])
+                combined_text = "\n\n".join([d.page_content for d in docs])
+            else:
+                combined_text = large_text
+
+            # Stage 3 — field extraction
+            extraction_record.processing_status = "extracting_fields"
+            extraction_record.progress = 80
+            extraction_record.processing_message = "Extracting required fields"
+            db.session.commit()
+
+            selected_template = get_template(template_name)
+            results = extract_all_fields(data_points, combined_text, gemini_model, selected_template)
+
+            # Done
+            result_status = {
+                field["field"]: {"status": "pending", "value": None}
+                for field in data_points
+            }
+            extraction_record.results = results
+            extraction_record.timestamp = datetime.now()
+            extraction_record.result_status = result_status
+            extraction_record.processing_status = "completed"
+            extraction_record.progress = 100
+            extraction_record.processing_message = "Extraction completed"
+            db.session.commit()
+
+            # Save document record
+            try:
+                user_id = int(user_id_raw) if user_id_raw else None
+            except (TypeError, ValueError):
+                user_id = None
+
+            file_size = os.path.getsize(file_path)
+            template_row = Template.query.filter_by(template_name=template_name).first()
+            document = Document(
+                user_id=user_id,
+                filename=filename,
+                file_size=file_size,
+                file_type=file_type,
+                source_type=source_type,
+                template_id=template_row.id if template_row else None,
+                document_id=extraction_record.id
+            )
+            db.session.add(document)
+            db.session.commit()
+
+        except Exception as exc:
+            logger.error(f"Background processing failed: {exc}", exc_info=True)
+            extraction_record.processing_status = "failed"
+            extraction_record.progress = 0
+            extraction_record.processing_message = str(exc)
+            db.session.commit()
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            
 @app.route("/api/extract", methods=["POST"])
 def extract():
     uploaded_files = request.files.getlist("file")
@@ -424,167 +529,67 @@ def extract():
     except (json.JSONDecodeError, ValueError) as exc:
         return jsonify({"error": str(exc)}), 400
 
-    all_results = {}
-    processing_times = []
-    overall_start = time.perf_counter()
+    record_ids = []
 
     for uploaded_file in uploaded_files:
         if not uploaded_file or uploaded_file.filename == "":
             continue
 
-        file_key = uploaded_file.filename
-        try:
-            logger.info(f"\n{'='*80}")
-            logger.info(f"Processing file: {file_key}")
-            logger.info(f"{'='*80}")
+        # Save file immediately (before handing off to thread)
+        os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+        file_path = os.path.join(app.config["UPLOAD_FOLDER"], uploaded_file.filename)
+        uploaded_file.save(file_path)
 
-            file_start = time.perf_counter()
-            suffix = os.path.splitext(uploaded_file.filename)[1] or ""
+        # Create DB record right now so we can return the ID
+        extraction_record = ExtractionRecord(
+            file_name=uploaded_file.filename,
+            data_points=data_points,
+            template_name=template_name,
+            timestamp=None,
+            results=None,
+            result_status=None,
+            processing_status="uploaded",
+            progress=5,
+            processing_message="File uploaded, queued for processing"
+        )
+        db.session.add(extraction_record)
+        db.session.commit()
+        record_id = extraction_record.id
+        record_ids.append(record_id)
 
-            os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-            file_path = os.path.join(app.config["UPLOAD_FOLDER"], uploaded_file.filename)
-            uploaded_file.save(file_path)
+        # Capture values for the thread (can't pass request context)
+        user_id_raw = (request.form.get("user_id") or "").strip()
+        source_type = (request.form.get("upload_source") or "local").strip()
+        file_type = (uploaded_file.mimetype or "").strip()
 
-            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-                with open(file_path, "rb") as f:
-                    tmp.write(f.read())
-                tmp_path = tmp.name
-
-            try:
-                p = get_pipeline()
-                ppp = p["ppp"]
-                gemini_model = p["gemini_model"]
-                encoding = p["encoding"]
-
-                t_pdf = time.perf_counter()
-                logger.info("[1/3] File text extraction started")
-                large_text = extract_text_from_file(
-                    tmp_path,
-                    uploaded_file.mimetype,
-                    uploaded_file.filename
-                )
-                with open("extracted_text.txt", "w", encoding="utf-8") as f:
-                    f.write(large_text)
-                logger.info(f"[1/3] Done ({time.perf_counter()-t_pdf:.2f}s)")
-
-                pdf_tokens = len(encoding.encode(large_text))
-                logger.info(f"[2/3] Extracted text tokens: {pdf_tokens}")
-
-                if pdf_tokens > 40000:
-                    logger.info("[2/3] Large doc — building FAISS retriever")
-                    texts = ppp.split_text(large_text, 4000, buffer=400)
-                    vectorstore = ppp.create_vectorstore(texts)
-                    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
-
-                    field_parts = [dp["field"] for dp in data_points]
-                    common_financial_terms = [
-                        "Balance Sheet", "Statement of Profit and Loss", "Cash Flow Statement",
-                        "Total Assets", "Total Liabilities", "Revenue", "Net Income", "Gross Profit",
-                        "Operating Income", "EBITDA", "Cash and Cash Equivalents", "Current Assets",
-                        "Current Liabilities", "Total Debt", "Interest Expense", "Operating Cash Flow",
-                        "Capital Expenditure", "Free Cash Flow", "Share Capital", "Reserves", "Equity"
-                    ]
-                    field_parts.extend(common_financial_terms)
-
-                    query = " ".join(field_parts)[:1500]
-                    docs = retriever.get_relevant_documents(query)
-                    combined_text = "\n\n".join([d.page_content for d in docs])
-                else:
-                    combined_text = large_text
-
-                t_fields = time.perf_counter()
-                context_tokens = len(encoding.encode(combined_text))
-                logger.info(f"[3/3] Batch field extraction fields={len(data_points)} context_tokens={context_tokens}")
-
-                selected_template = get_template(template_name)
-                results = extract_all_fields(data_points, combined_text, gemini_model, selected_template)
-
-                logger.info(f"[3/3] Done ({time.perf_counter()-t_fields:.2f}s)")
-
-                file_processing_time = time.perf_counter() - file_start
-                processing_times.append(file_processing_time)
-
-                all_results[file_key] = {
-                    "extracted_fields": results,
-                    "file_status": "success",
-                    "processing_time": round(file_processing_time, 2)
-                }
-
-                result_status = {
-                    field["field"]: {"status": "pending", "value": None}
-                    for field in data_points
-                }
-                timestamp = datetime.now()
-
-                extraction_record = ExtractionRecord(
-                    file_name=uploaded_file.filename,
-                    data_points=data_points,
-                    results=results,
-                    template_name=template_name,
-                    timestamp=timestamp,
-                    result_status=result_status
-                )
-                db.session.add(extraction_record)
-                db.session.commit()
-                db.session.flush()
-
-                user_id_raw = (request.form.get("user_id") or "").strip()
-                source_type = (request.form.get("upload_source") or "local").strip()
-                file_type = (uploaded_file.mimetype or "").strip()
-                file_size = uploaded_file.content_length or os.path.getsize(file_path)
-
-                template_row = Template.query.filter_by(template_name=template_name).first()
-                template_id = template_row.id if template_row else None
-
-                try:
-                    user_id = int(user_id_raw) if user_id_raw else None
-                except (TypeError, ValueError):
-                    user_id = None
-
-                document = Document(
-                    user_id=user_id,
-                    filename=uploaded_file.filename,
-                    file_size=file_size,
-                    file_type=file_type,
-                    source_type=source_type,
-                    template_id=template_id,
-                    document_id=extraction_record.id
-                )
-                db.session.add(document)
-                db.session.commit()
-
-            except Exception as exc:
-                logger.error(f"Processing failed for {file_key}: {exc}", exc_info=True)
-                all_results[file_key] = {
-                    "error": str(exc),
-                    "file_status": "failed"
-                }
-            finally:
-                try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    pass
-
-        except Exception as exc:
-            logger.error(f"File processing error for {file_key}: {exc}", exc_info=True)
-            all_results[file_key] = {
-                "error": str(exc),
-                "file_status": "failed"
-            }
-
-    total_time = time.perf_counter() - overall_start
-    successful = sum(1 for v in all_results.values() if v.get("file_status") == "success")
-    failed = sum(1 for v in all_results.values() if v.get("file_status") == "failed")
+        # Run the heavy work in background
+        thread = threading.Thread(
+            target=process_file_background,
+            args=(app, record_id, file_path, data_points, template_name,
+                  uploaded_file.filename, user_id_raw, source_type, file_type),
+            daemon=True
+        )
+        thread.start()
 
     return jsonify({
-        "status": "completed",
-        "results": all_results,
-        "summary": {
-            "total_files": len(all_results),
-            "successful": successful,
-            "failed": failed,
-            "total_time": round(total_time, 2)
-        }
+        "status": "queued",
+        "record_ids": record_ids,
+        "record_id": record_ids[0] if record_ids else None  # convenience for single file
+    })
+
+
+@app.route("/api/extraction-status/<int:record_id>")
+def extraction_status(record_id):
+
+    record = ExtractionRecord.query.get(record_id)
+
+    if not record:
+        return jsonify({"error": "Record not found"}), 404
+
+    return jsonify({
+        "status": record.processing_status,
+        "progress": record.progress,
+        "message": record.processing_message
     })
 
 @app.route("/api/health", methods=["GET"])

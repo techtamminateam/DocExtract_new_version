@@ -15,6 +15,11 @@ class ExtractionRecord(db.Model):
     data_points = db.Column(db.JSON, nullable=False)
     results = db.Column(db.JSON, nullable=True)
     result_status = db.Column(db.JSON, nullable=False)
+    processing_status = db.Column(db.String(20))
+    progress = db.Column(db.Integer, default=0)
+    processing_message = db.Column(db.Text)
+
+
 
 
 class Template(db.Model):
@@ -92,7 +97,7 @@ class Document(db.Model):
     upload_time = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     file_size = db.Column(db.Integer, nullable=False)
     template_id = db.Column(db.Integer, db.ForeignKey('templates.id'), nullable=True)
-    file_type = db.Column(db.String(50), nullable=False, index=True)
+    file_type = db.Column(db.String(120), nullable=False, index=True)
     source_type = db.Column(db.String(50), nullable=True)
     deleted_at = db.Column(db.DateTime, nullable=True)
     document_id = db.Column(db.Integer, nullable=False, unique=True)

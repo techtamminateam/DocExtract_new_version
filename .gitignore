@@ -9,6 +9,7 @@ backend/venv/
 # Environment variables
 .env
 backend/.env
+backend/.env1
 
 backend/flask_sessions/
 

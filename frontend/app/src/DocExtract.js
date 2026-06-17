@@ -1048,7 +1048,7 @@ function NewExtractionUI({
               >
                 <input 
                   type="file" 
-                  accept="application/pdf,image/*"
+                  accept="application/pdf,image/*,.doc,.docx"
                   multiple   
                   ref={fileInputRef} 
                   onChange={onFileChange}
@@ -3190,13 +3190,17 @@ export default function DocExtract({ onLogout }) {
 
   // ── File Handling ──────────────────────────────────────────────────────────
   const ALLOWED_TYPES = [
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "image/jpg",
-  "image/webp",
-  "image/tiff"
-];
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+    "image/tiff",
+
+    // Word documents
+    "application/msword", // .doc
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  ];
   const applyFile = useCallback((f) => {
   if (!f) return;
   if (ALLOWED_TYPES.includes(f.type)) {
