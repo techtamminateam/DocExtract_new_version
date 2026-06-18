@@ -19,9 +19,6 @@ class ExtractionRecord(db.Model):
     progress = db.Column(db.Integer, default=0)
     processing_message = db.Column(db.Text)
 
-
-
-
 class Template(db.Model):
     __tablename__ = "templates"
 
@@ -49,7 +46,7 @@ class User(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    password = db.Column(db.String(255), nullable=False)
+    password = db.Column(db.String(255))
     verification_code = db.Column(db.String(6), nullable=True)
     is_verified = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)

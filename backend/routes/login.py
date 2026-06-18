@@ -97,11 +97,8 @@ def change_password():
 def send_verification_code():
     data = request.get_json()
     email = data.get('email')
-    password = data.get('password')
-    
     verification_code = str(random.randint(100000, 999999))
     user = User(email=email, verification_code=verification_code)
-    user.set_password(password)
     db.session.add(user)
     db.session.commit()
     
@@ -209,12 +206,14 @@ def verify_otp():
 def verify_code():
     data = request.get_json()
     email = data.get('email')
+    password = data.get('password')
     verification_code = data.get('verification_code')
 
 
     user = User.query.filter_by(email=email, verification_code=verification_code).first()
     if user:
         user.is_verified = True
+        user.set_password(password)
         user.verification_code = None
         db.session.commit()
         db.session.flush() 

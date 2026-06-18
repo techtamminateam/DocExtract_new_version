@@ -424,10 +424,7 @@ const AIExtracterLanding = ({ onLoginSuccess }) => {
       return;
     }
 
-    if (!accountData.password.trim()) {
-      setErrors({ password: "Password is required before sending a code" });
-      return;
-    }
+    
 
     setIsSendingCode(true);
     setErrors({});
@@ -437,8 +434,7 @@ const AIExtracterLanding = ({ onLoginSuccess }) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: accountData.email,
-          password: accountData.password,
+          email: accountData.email
         }),
       });
 
